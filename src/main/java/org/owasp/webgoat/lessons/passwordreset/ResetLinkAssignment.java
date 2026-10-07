@@ -12,7 +12,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import org.owasp.webgoat.container.CurrentUsername;
 import org.owasp.webgoat.container.assignments.AssignmentEndpoint;
 import org.owasp.webgoat.container.assignments.AssignmentHints;
 import org.owasp.webgoat.container.assignments.AttackResult;
@@ -44,13 +43,10 @@ import org.springframework.web.servlet.ModelAndView;
 public class ResetLinkAssignment implements AssignmentEndpoint {
 
   private static final String VIEW_FORMATTER = "lessons/passwordreset/templates/%s.html";
-  static final String PASSWORD_TOM_9 =
-      "somethingVeryRandomWhichNoOneWillEverTypeInAsPasswordForTom";
-  static final String TOM_USERNAME = "tom";
   static final String TOM_EMAIL = "tom@webgoat-cloud.org";
   static final Duration RESET_LINK_LIFETIME = Duration.ofMinutes(10);
   static final Map<String, ResetLink> resetLinks = new ConcurrentHashMap<>();
-  static final Map<String, String> usersToTomPassword = new ConcurrentHashMap<>();
+  static final Map<String, String> resetPasswordsByEmail = new ConcurrentHashMap<>();
 
   record ResetLink(String email, Instant expiresAt) {}
 
@@ -70,26 +66,18 @@ public class ResetLinkAssignment implements AssignmentEndpoint {
 
   @PostMapping("/PasswordReset/reset/login")
   @ResponseBody
-  public AttackResult login(
-      @RequestParam String password, @RequestParam String email, @CurrentUsername String username) {
-    if (TOM_EMAIL.equals(email) && TOM_USERNAME.equals(username)) {
-      String passwordTom = usersToTomPassword.getOrDefault(username, PASSWORD_TOM_9);
-      if (passwordTom.equals(PASSWORD_TOM_9)) {
-        return failed(this).feedback("login_failed").build();
-      } else if (passwordTom.equals(password)) {
-        return success(this).build();
-      }
+  public AttackResult login(@RequestParam String password, @RequestParam String email) {
+    String savedPassword = resetPasswordsByEmail.get(email);
+    if (TOM_EMAIL.equals(email) && savedPassword != null && savedPassword.equals(password)) {
+      return success(this).build();
     }
     return failed(this).feedback("login_failed.tom").build();
   }
 
   @GetMapping("/PasswordReset/reset/reset-password/{link}")
-  public ModelAndView resetPassword(
-      @PathVariable(value = "link") String link,
-      Model model,
-      @CurrentUsername String username) {
+  public ModelAndView resetPassword(@PathVariable(value = "link") String link, Model model) {
     ModelAndView modelAndView = new ModelAndView();
-    if (ownsRecipient(validLink(link), username)) {
+    if (validLink(link) != null) {
       PasswordChangeForm form = new PasswordChangeForm();
       form.setResetLink(link);
       model.addAttribute("form", form);
@@ -105,8 +93,7 @@ public class ResetLinkAssignment implements AssignmentEndpoint {
   @PostMapping("/PasswordReset/reset/change-password")
   public ModelAndView changePassword(
       @ModelAttribute("form") PasswordChangeForm form,
-      BindingResult bindingResult,
-      @CurrentUsername String username) {
+      BindingResult bindingResult) {
     ModelAndView modelAndView = new ModelAndView();
     if (!hasText(form.getPassword())) {
       bindingResult.rejectValue("password", "not.empty");
@@ -116,14 +103,11 @@ public class ResetLinkAssignment implements AssignmentEndpoint {
       return modelAndView;
     }
     ResetLink resetLink = validLink(form.getResetLink());
-    if (!ownsRecipient(resetLink, username)
-        || !resetLinks.remove(form.getResetLink(), resetLink)) {
+    if (resetLink == null || !resetLinks.remove(form.getResetLink(), resetLink)) {
       modelAndView.setViewName(VIEW_FORMATTER.formatted("password_link_not_found"));
       return modelAndView;
     }
-    if (TOM_EMAIL.equals(resetLink.email())) {
-      usersToTomPassword.put(username, form.getPassword());
-    }
+    resetPasswordsByEmail.put(resetLink.email(), form.getPassword());
     modelAndView.setViewName(VIEW_FORMATTER.formatted("success"));
     return modelAndView;
   }
@@ -140,12 +124,4 @@ public class ResetLinkAssignment implements AssignmentEndpoint {
     return resetLink;
   }
 
-  private boolean ownsRecipient(ResetLink resetLink, String username) {
-    if (resetLink == null || !hasText(username)) {
-      return false;
-    }
-    String email = resetLink.email();
-    return (username + "@webgoat.org").equalsIgnoreCase(email)
-        || (TOM_USERNAME.equalsIgnoreCase(username) && TOM_EMAIL.equalsIgnoreCase(email));
-  }
 }

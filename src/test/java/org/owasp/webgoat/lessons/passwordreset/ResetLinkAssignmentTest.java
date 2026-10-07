@@ -21,7 +21,6 @@ import org.hamcrest.CoreMatchers;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-import org.owasp.webgoat.WithWebGoatUser;
 import org.owasp.webgoat.container.plugins.LessonTest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -56,7 +55,7 @@ class ResetLinkAssignmentTest extends LessonTest {
   public void setup() {
     this.mockMvc = MockMvcBuilders.webAppContextSetup(this.wac).build();
     ResetLinkAssignment.resetLinks.clear();
-    ResetLinkAssignment.usersToTomPassword.clear();
+    ResetLinkAssignment.resetPasswordsByEmail.clear();
   }
 
   @Test
@@ -208,42 +207,14 @@ class ResetLinkAssignmentTest extends LessonTest {
   }
 
   @Test
-  void stolenTomLinkCannotBeRedeemedByAnotherUser() throws Exception {
-    String token = "stolen-tom-token";
-    ResetLinkAssignment.resetLinks.put(
-        token, new ResetLinkAssignment.ResetLink(TOM_EMAIL, Instant.now().plusSeconds(60)));
+  void anotherMailboxPasswordCannotValidateTomsLogin() {
+    ResetLinkAssignment.resetPasswordsByEmail.put("test@webgoat.org", "newpass");
 
-    mockMvc
-        .perform(MockMvcRequestBuilders.get("/PasswordReset/reset/reset-password/{link}", token))
-        .andExpect(status().isOk())
-        .andExpect(view().name("lessons/passwordreset/templates/password_link_not_found.html"));
-    mockMvc
-        .perform(
-            MockMvcRequestBuilders.post("/PasswordReset/reset/change-password")
-                .param("resetLink", token)
-                .param("password", "attacker-password"))
-        .andExpect(status().isOk())
-        .andExpect(view().name("lessons/passwordreset/templates/password_link_not_found.html"));
-    mockMvc
-        .perform(
-            MockMvcRequestBuilders.post("/PasswordReset/reset/login")
-                .param("email", TOM_EMAIL)
-                .param("password", "attacker-password"))
-        .andExpect(jsonPath("$.lessonCompleted", CoreMatchers.is(false)));
-    Assertions.assertThat(ResetLinkAssignment.resetLinks).containsKey(token);
-  }
-
-  @Test
-  void attackerSessionCannotValidateTomsLogin() {
-    // A legacy session entry must not be treated as Tom's account password.
-    ResetLinkAssignment.usersToTomPassword.put("attacker", "newpass");
-
-    Assertions.assertThat(resetLinkAssignment.login("newpass", TOM_EMAIL, "attacker").isLessonCompleted())
+    Assertions.assertThat(resetLinkAssignment.login("newpass", TOM_EMAIL).isLessonCompleted())
         .isFalse();
   }
 
   @Test
-  @WithWebGoatUser(username = "tom")
   void tomsLinkChangesHisPasswordOnlyOnce() throws Exception {
     String token = "verified-tom-token";
     ResetLinkAssignment.resetLinks.put(
@@ -256,9 +227,10 @@ class ResetLinkAssignmentTest extends LessonTest {
                 .param("password", "newpass"))
         .andExpect(status().isOk())
         .andExpect(view().name("lessons/passwordreset/templates/success.html"));
-    Assertions.assertThat(ResetLinkAssignment.usersToTomPassword).containsEntry("tom", "newpass");
+    Assertions.assertThat(ResetLinkAssignment.resetPasswordsByEmail)
+        .containsEntry(TOM_EMAIL, "newpass");
 
-    Assertions.assertThat(resetLinkAssignment.login("newpass", TOM_EMAIL, "tom").isLessonCompleted())
+    Assertions.assertThat(resetLinkAssignment.login("newpass", TOM_EMAIL).isLessonCompleted())
         .isTrue();
 
     mockMvc
