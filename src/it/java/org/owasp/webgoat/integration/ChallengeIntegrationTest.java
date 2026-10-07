@@ -119,18 +119,16 @@ public class ChallengeIntegrationTest extends IntegrationTest {
     startLesson("Challenge7");
     cleanMailbox();
 
-    // One should first be able to download git.zip from WebGoat
+    // The former source archive is no longer exposed.
       RestAssured.given()
         .when()
         .relaxedHTTPSValidation()
         .cookie("JSESSIONID", getWebGoatCookie())
         .get(webGoatUrlConfig.url("challenge/7/.git"))
         .then()
-        .statusCode(200)
-        .extract()
-        .asString();
+        .statusCode(404);
 
-    // Should email WebWolf inbox this should give a hint to the link being static
+    // The current user can request a one-time link in their own mailbox.
       RestAssured.given()
         .when()
         .relaxedHTTPSValidation()
@@ -156,19 +154,13 @@ public class ChallengeIntegrationTest extends IntegrationTest {
             .asString();
     Assertions.assertThat(responseBody).contains("Hi, you requested a password reset link");
 
-    // Call reset link with admin link
-      String result =
-        RestAssured.given()
+    // The former static admin link cannot redeem a reset or reveal the flag.
+      RestAssured.given()
             .when()
             .relaxedHTTPSValidation()
             .cookie("JSESSIONID", getWebGoatCookie())
             .get(webGoatUrlConfig.url("challenge/7/reset-password/{link}"), "375afe1104f4a487a73823c50a9292a2")
             .then()
-            .statusCode(HttpStatus.ACCEPTED.value())
-            .extract()
-            .asString();
-
-    String flag = result.substring(result.indexOf("flag") + 6, result.indexOf("flag") + 42);
-      checkAssignment(webGoatUrlConfig.url("challenge/flag/7"), Map.of("flag", flag), true);
+            .statusCode(HttpStatus.I_AM_A_TEAPOT.value());
   }
 }
