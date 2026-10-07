@@ -4,86 +4,95 @@
  */
 package org.owasp.webgoat.integration;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import io.restassured.RestAssured;
 import io.restassured.http.ContentType;
 import java.util.Map;
 import org.apache.http.HttpStatus;
 import org.junit.jupiter.api.Test;
+import org.owasp.webgoat.lessons.missingac.DisplayUser;
+import org.owasp.webgoat.lessons.missingac.MissingFunctionAC;
+import org.owasp.webgoat.lessons.missingac.User;
 
 class AccessControlIntegrationTest extends IntegrationTest {
 
   @Test
-  void testLesson() {
+  void ordinaryUserCannotReachAdministrativeFunctions() {
     startLesson("MissingFunctionAC", true);
-    assignment1();
-    assignment2();
-    assignment3();
 
-    checkResults("MissingFunctionAC");
+    String lessonHtml =
+        RestAssured.given()
+            .relaxedHTTPSValidation()
+            .cookie("JSESSIONID", getWebGoatCookie())
+            .get(webGoatUrlConfig.url("MissingFunctionAC.lesson.lesson"))
+            .then()
+            .statusCode(HttpStatus.SC_OK)
+            .extract()
+            .asString();
+    assertThat(lessonHtml).doesNotContain("access-control/users-admin-fix");
+
+    assertForbiddenGet("access-control/users");
+    assertForbiddenJsonGet("access-control/users");
+    assertForbiddenJsonGet("access-control/users-admin-fix");
+
+    String selfGrant =
+        """
+        {"username":"%s","password":"password","admin":true}
+        """
+            .formatted(getUser());
+    assertForbiddenJsonPost("access-control/users", selfGrant);
+    assertForbiddenJsonPost("access-control/users-admin-fix", selfGrant);
+
+    String simpleHash = "SVtOlaa+ER+w2eoIIVE5/77umvhcsh5V8UyDLUa1Itg=";
+    String adminHash =
+        new DisplayUser(
+                new User("Jerry", "doesnotreallymatter", true),
+                MissingFunctionAC.PASSWORD_SALT_ADMIN)
+            .getUserHash();
+    assertForbiddenForm(
+        "access-control/hidden-menu", Map.of("hiddenMenu1", "Users", "hiddenMenu2", "Config"));
+    assertForbiddenForm("access-control/user-hash", Map.of("userHash", simpleHash));
+    assertForbiddenForm("access-control/user-hash-fix", Map.of("userHash", adminHash));
   }
 
-  private void assignment3() {
-    // direct call should fail if user has not been created
-      RestAssured.given()
-        .when()
+  private void assertForbiddenGet(String path) {
+    RestAssured.given()
         .relaxedHTTPSValidation()
         .cookie("JSESSIONID", getWebGoatCookie())
-        .contentType(ContentType.JSON)
-        .get(webGoatUrlConfig.url("access-control/users-admin-fix"))
+        .get(webGoatUrlConfig.url(path))
         .then()
         .statusCode(HttpStatus.SC_FORBIDDEN);
+  }
 
-    // create user
-    var userTemplate =
-        """
-        {"username":"%s","password":"%s","admin": "true"}
-        """;
-      RestAssured.given()
-        .when()
+  private void assertForbiddenJsonGet(String path) {
+    RestAssured.given()
         .relaxedHTTPSValidation()
         .cookie("JSESSIONID", getWebGoatCookie())
         .contentType(ContentType.JSON)
-        .body(String.format(userTemplate, this.getUser(), this.getUser()))
-        .post(webGoatUrlConfig.url("access-control/users"))
+        .get(webGoatUrlConfig.url(path))
         .then()
-        .statusCode(HttpStatus.SC_OK);
-
-    // get the users
-      var userHash =
-        RestAssured.given()
-            .when()
-            .relaxedHTTPSValidation()
-            .cookie("JSESSIONID", getWebGoatCookie())
-            .contentType(ContentType.JSON)
-            .get(webGoatUrlConfig.url("access-control/users-admin-fix"))
-            .then()
-            .statusCode(200)
-            .extract()
-            .jsonPath()
-            .get("find { it.username == \"Jerry\" }.userHash");
-
-      checkAssignment(webGoatUrlConfig.url("access-control/user-hash-fix"), Map.of("userHash", userHash), true);
+        .statusCode(HttpStatus.SC_FORBIDDEN);
   }
 
-  private void assignment2() {
-      var userHash =
-        RestAssured.given()
-            .when()
-            .relaxedHTTPSValidation()
-            .cookie("JSESSIONID", getWebGoatCookie())
-            .contentType(ContentType.JSON)
-            .get(webGoatUrlConfig.url("access-control/users"))
-            .then()
-            .statusCode(200)
-            .extract()
-            .jsonPath()
-            .get("find { it.username == \"Jerry\" }.userHash");
-
-      checkAssignment(webGoatUrlConfig.url("access-control/user-hash"), Map.of("userHash", userHash), true);
+  private void assertForbiddenJsonPost(String path, String body) {
+    RestAssured.given()
+        .relaxedHTTPSValidation()
+        .cookie("JSESSIONID", getWebGoatCookie())
+        .contentType(ContentType.JSON)
+        .body(body)
+        .post(webGoatUrlConfig.url(path))
+        .then()
+        .statusCode(HttpStatus.SC_FORBIDDEN);
   }
 
-  private void assignment1() {
-    var params = Map.of("hiddenMenu1", "Users", "hiddenMenu2", "Config");
-      checkAssignment(webGoatUrlConfig.url("access-control/hidden-menu"), params, true);
+  private void assertForbiddenForm(String path, Map<String, String> params) {
+    RestAssured.given()
+        .relaxedHTTPSValidation()
+        .cookie("JSESSIONID", getWebGoatCookie())
+        .formParams(params)
+        .post(webGoatUrlConfig.url(path))
+        .then()
+        .statusCode(HttpStatus.SC_FORBIDDEN);
   }
 }

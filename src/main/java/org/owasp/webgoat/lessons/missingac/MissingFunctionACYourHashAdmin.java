@@ -7,6 +7,7 @@ package org.owasp.webgoat.lessons.missingac;
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.failed;
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.success;
 import static org.owasp.webgoat.lessons.missingac.MissingFunctionAC.PASSWORD_SALT_ADMIN;
+import static org.owasp.webgoat.lessons.missingac.MissingFunctionAccessPolicy.requireAdmin;
 
 import org.owasp.webgoat.container.assignments.AssignmentEndpoint;
 import org.owasp.webgoat.container.assignments.AssignmentHints;
@@ -39,12 +40,10 @@ public class MissingFunctionACYourHashAdmin implements AssignmentEndpoint {
       produces = {"application/json"})
   @ResponseBody
   public AttackResult admin(String userHash) {
-    // current user should be in the DB
-    // if not admin then return 403
-
+    requireAdmin();
     var user = userRepository.findByUsername("Jerry");
     var displayUser = new DisplayUser(user, PASSWORD_SALT_ADMIN);
-    if (userHash.equals(displayUser.getUserHash())) {
+    if (displayUser.getUserHash().equals(userHash)) {
       return success(this).feedback("access-control.hash.success").build();
     } else {
       return failed(this).feedback("access-control.hash.close").build();

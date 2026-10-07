@@ -1,11 +1,10 @@
-<html xmlns:th="http://www.thymeleaf.org">
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 
 <div class="lesson-page-wrapper">
     <div class="adoc-content" th:replace="~{doc:lessons/missingac/documentation/missing-function-ac-01-intro.adoc}"></div>
 </div>
 
 <div class="lesson-page-wrapper">
-    <link rel="stylesheet" type="text/css" th:href="@{/lesson_css/ac.css}"/>
     <div class="adoc-content" th:replace="~{doc:lessons/missingac/documentation/missing-function-ac-02-client-controls.adoc}"></div>
 
     <div class="attack-container">
@@ -34,7 +33,7 @@
                                 <li><a href="#">Compose Message</a></li>
                             </ul>
                         </li>
-                        <li class="hidden-menu-item dropdown">
+                        <li class="dropdown" sec:authorize="hasAuthority('WEBGOAT_ADMIN')">
                             <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">Admin<span class="caret"></span></a>
                             <ul class="dropdown-menu" aria-labelledby="admin">
                                 <li><a href="access-control/users-admin-fix">Users</a></li>
