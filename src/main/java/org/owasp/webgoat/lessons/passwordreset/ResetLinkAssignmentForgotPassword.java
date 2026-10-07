@@ -5,17 +5,17 @@
 package org.owasp.webgoat.lessons.passwordreset;
 
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.failed;
-import static org.owasp.webgoat.container.assignments.AttackResultBuilder.success;
+import static org.owasp.webgoat.container.assignments.AttackResultBuilder.informationMessage;
 
 import jakarta.servlet.http.HttpServletRequest;
+import java.time.Instant;
+import java.util.Locale;
 import java.util.UUID;
 import org.owasp.webgoat.container.CurrentUsername;
 import org.owasp.webgoat.container.assignments.AssignmentEndpoint;
 import org.owasp.webgoat.container.assignments.AttackResult;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
@@ -32,21 +32,21 @@ import org.springframework.web.client.RestTemplate;
 public class ResetLinkAssignmentForgotPassword implements AssignmentEndpoint {
 
   private final RestTemplate restTemplate;
+  private final String webGoatURL;
   private final String webWolfHost;
   private final String webWolfPort;
-  private final String webWolfURL;
   private final String webWolfMailURL;
 
   public ResetLinkAssignmentForgotPassword(
       RestTemplate restTemplate,
+      @Value("${webgoat.url}") String webGoatURL,
       @Value("${webwolf.host}") String webWolfHost,
       @Value("${webwolf.port}") String webWolfPort,
-      @Value("${webwolf.url}") String webWolfURL,
       @Value("${webwolf.mail.url}") String webWolfMailURL) {
     this.restTemplate = restTemplate;
+    this.webGoatURL = webGoatURL.replaceAll("/+$", "");
     this.webWolfHost = webWolfHost;
     this.webWolfPort = webWolfPort;
-    this.webWolfURL = webWolfURL;
     this.webWolfMailURL = webWolfMailURL;
   }
 
@@ -54,50 +54,47 @@ public class ResetLinkAssignmentForgotPassword implements AssignmentEndpoint {
   @ResponseBody
   public AttackResult sendPasswordResetLink(
       @RequestParam String email, HttpServletRequest request, @CurrentUsername String username) {
-    String resetLink = UUID.randomUUID().toString();
-    ResetLinkAssignment.resetLinks.add(resetLink);
+    String normalizedEmail = email.trim().toLowerCase(Locale.ROOT);
+    String ownMailbox = username.toLowerCase(Locale.ROOT) + "@webgoat.org";
+    if (!ownMailbox.equals(normalizedEmail)
+        && !ResetLinkAssignment.TOM_EMAIL.equals(normalizedEmail)) {
+      // Only lesson mailboxes can receive a token; the reply does not reveal whether one was sent.
+      return informationMessage(this).feedback("email.send").feedbackArgs(email).build();
+    }
     String host = request.getHeader(HttpHeaders.HOST);
-    if (ResetLinkAssignment.TOM_EMAIL.equals(email)
-        && (host.contains(webWolfPort)
-            && host.contains(webWolfHost))) { // User indeed changed the host header.
-      ResetLinkAssignment.userToTomResetLink.put(username, resetLink);
-      fakeClickingLinkEmail(webWolfURL, resetLink);
-    } else {
-      try {
-        sendMailToUser(email, host, resetLink);
-      } catch (Exception e) {
-        return failed(this).output("E-mail can't be send. please try again.").build();
-      }
+    if (ResetLinkAssignment.TOM_EMAIL.equals(normalizedEmail)
+        && host != null
+        && host.contains(webWolfHost)
+        && host.contains(webWolfPort)) {
+      // A poisoned Host header cannot trigger a reset for Tom.
+      return informationMessage(this).feedback("email.send").feedbackArgs(email).build();
+    }
+    String resetLink = UUID.randomUUID().toString();
+    ResetLinkAssignment.resetLinks.put(
+        resetLink,
+        new ResetLinkAssignment.ResetLink(
+            normalizedEmail, Instant.now().plus(ResetLinkAssignment.RESET_LINK_LIFETIME)));
+    try {
+      sendMailToUser(normalizedEmail, resetLink);
+    } catch (Exception e) {
+      ResetLinkAssignment.resetLinks.remove(resetLink);
+      return failed(this).output("E-mail can't be send. please try again.").build();
     }
 
-    return success(this).feedback("email.send").feedbackArgs(email).build();
+    // Delivering a link is not proof that the requester controls the mailbox.
+    return informationMessage(this).feedback("email.send").feedbackArgs(email).build();
   }
 
-  private void sendMailToUser(String email, String host, String resetLink) {
+  private void sendMailToUser(String email, String resetLink) {
     int index = email.indexOf("@");
     String username = email.substring(0, index == -1 ? email.length() : index);
     PasswordResetEmail mail =
         PasswordResetEmail.builder()
             .title("Your password reset link")
-            .contents(String.format(ResetLinkAssignment.TEMPLATE, host, resetLink))
+            .contents(String.format(ResetLinkAssignment.TEMPLATE, webGoatURL, resetLink))
             .sender("password-reset@webgoat-cloud.net")
             .recipient(username)
             .build();
     this.restTemplate.postForEntity(webWolfMailURL, mail, Object.class);
-  }
-
-  private void fakeClickingLinkEmail(String webWolfURL, String resetLink) {
-    try {
-      HttpHeaders httpHeaders = new HttpHeaders();
-      HttpEntity httpEntity = new HttpEntity(httpHeaders);
-      new RestTemplate()
-          .exchange(
-              String.format("%s/PasswordReset/reset/reset-password/%s", webWolfURL, resetLink),
-              HttpMethod.GET,
-              httpEntity,
-              Void.class);
-    } catch (Exception e) {
-      // don't care
-    }
   }
 }
