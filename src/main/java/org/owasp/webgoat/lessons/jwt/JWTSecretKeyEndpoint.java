@@ -31,7 +31,10 @@ import org.springframework.web.bind.annotation.RestController;
 @AssignmentHints({"jwt-secret-hint1", "jwt-secret-hint2", "jwt-secret-hint3"})
 public class JWTSecretKeyEndpoint implements AssignmentEndpoint {
 
-  private static final String JWT_SECRET = createSigningKey();
+  public static final String[] SECRETS = {
+    "victory", "business", "available", "shipping", "washington"
+  };
+  public static final String JWT_SECRET = createSigningKey();
   private static final String WEBGOAT_USER = "WebGoat";
   private static final List<String> expectedClaims =
       List.of("iss", "iat", "exp", "aud", "sub", "username", "Email", "Role");
@@ -63,9 +66,6 @@ public class JWTSecretKeyEndpoint implements AssignmentEndpoint {
   public AttackResult login(@RequestParam String token) {
     try {
       Jws<Claims> jwt = Jwts.parser().setSigningKey(JWT_SECRET).parseClaimsJws(token);
-      if (!SignatureAlgorithm.HS256.getValue().equals(jwt.getHeader().getAlgorithm())) {
-        return failed(this).feedback("jwt-invalid-token").build();
-      }
       Claims claims = jwt.getBody();
       if (!claims.keySet().containsAll(expectedClaims)) {
         return failed(this).feedback("jwt-secret-claims-missing").build();

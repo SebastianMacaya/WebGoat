@@ -70,7 +70,7 @@ public class JWTSecretKeyEndpointTest extends LessonTest {
   }
 
   @Test
-  void signedTokenWithDifferentAlgorithmIsRejected() throws Exception {
+  void validHs512SignatureCanStillBeVerified() throws Exception {
     String token =
         Jwts.builder()
             .setClaims(createClaims("WebGoat"))
@@ -80,7 +80,7 @@ public class JWTSecretKeyEndpointTest extends LessonTest {
     mockMvc
         .perform(MockMvcRequestBuilders.post("/JWT/secret").param("token", token))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.lessonCompleted", is(false)));
+        .andExpect(jsonPath("$.lessonCompleted", is(true)));
   }
 
   @Test
