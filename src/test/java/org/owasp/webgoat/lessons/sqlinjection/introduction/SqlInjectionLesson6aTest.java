@@ -6,6 +6,7 @@ package org.owasp.webgoat.lessons.sqlinjection.introduction;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -16,77 +17,48 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 public class SqlInjectionLesson6aTest extends LessonTest {
 
   @Test
-  public void wrongSolution() throws Exception {
+  public void benignLastNameStillReturnsMatchingRows() throws Exception {
     mockMvc
         .perform(
             MockMvcRequestBuilders.post("/SqlInjectionAdvanced/attack6a")
-                .param("userid_6a", "John"))
+                .param("userid_6a", "Smith"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.lessonCompleted", is(false)));
+        .andExpect(jsonPath("$.lessonCompleted", is(false)))
+        .andExpect(jsonPath("$.output", containsString("Smith")));
   }
 
   @Test
-  public void wrongNumberOfColumns() throws Exception {
+  public void unionPayloadCannotReadPasswordTable() throws Exception {
     mockMvc
         .perform(
             MockMvcRequestBuilders.post("/SqlInjectionAdvanced/attack6a")
                 .param(
                     "userid_6a",
-                    "Smith' union select userid,user_name, password,cookie from user_system_data"
-                        + " --"))
+                    "Smith' union select userid,user_name, password,cookie,cookie,cookie,userid"
+                        + " from user_system_data --"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.lessonCompleted", is(false)))
-        .andExpect(
-            jsonPath(
-                "$.output",
-                containsString(
-                    "column number mismatch detected in rows of UNION, INTERSECT, EXCEPT, or VALUES"
-                        + " operation")));
+        .andExpect(jsonPath("$.output", not(containsString("passW0rD"))));
   }
 
   @Test
-  public void wrongDataTypeOfColumns() throws Exception {
-    mockMvc
-        .perform(
-            MockMvcRequestBuilders.post("/SqlInjectionAdvanced/attack6a")
-                .param(
-                    "userid_6a",
-                    "Smith' union select 1,password, 1,'2','3', '4',1 from user_system_data --"))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.lessonCompleted", is(false)))
-        .andExpect(jsonPath("$.output", containsString("incompatible data types in combination")));
-  }
-
-  @Test
-  public void correctSolution() throws Exception {
+  public void stackedStatementCannotReadPasswordTable() throws Exception {
     mockMvc
         .perform(
             MockMvcRequestBuilders.post("/SqlInjectionAdvanced/attack6a")
                 .param("userid_6a", "Smith'; SELECT * from user_system_data; --"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.lessonCompleted", is(true)))
-        .andExpect(jsonPath("$.feedback", containsString("passW0rD")));
-  }
-
-  @Test
-  public void noResultsReturned() throws Exception {
-    mockMvc
-        .perform(
-            MockMvcRequestBuilders.post("/SqlInjectionAdvanced/attack6a")
-                .param("userid_6a", "Smith' and 1 = 2 --"))
-        .andExpect(status().isOk())
         .andExpect(jsonPath("$.lessonCompleted", is(false)))
-        .andExpect(jsonPath("$.feedback", is(messages.getMessage("sql-injection.6a.no.results"))));
+        .andExpect(jsonPath("$.output", not(containsString("passW0rD"))));
   }
 
   @Test
-  public void noUnionUsed() throws Exception {
+  public void unknownLastNameDoesNotSolveAssignment() throws Exception {
     mockMvc
         .perform(
             MockMvcRequestBuilders.post("/SqlInjectionAdvanced/attack6a")
-                .param("userid_6a", "S'; Select * from user_system_data; --"))
+                .param("userid_6a", "Nobody"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.lessonCompleted", is(true)))
-        .andExpect(jsonPath("$.feedback", containsString("UNION")));
+        .andExpect(jsonPath("$.lessonCompleted", is(false)));
   }
 }
