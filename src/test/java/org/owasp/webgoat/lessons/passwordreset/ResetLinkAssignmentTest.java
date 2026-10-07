@@ -8,11 +8,13 @@ import static org.owasp.webgoat.lessons.passwordreset.ResetLinkAssignment.TOM_EM
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
+import java.net.URI;
 import java.time.Instant;
 import org.assertj.core.api.Assertions;
 import org.hamcrest.CoreMatchers;
@@ -24,9 +26,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.core.io.ResourceLoader;
-import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -147,7 +147,7 @@ class ResetLinkAssignmentTest extends LessonTest {
         .perform(
             MockMvcRequestBuilders.post("/PasswordReset/ForgotPassword/create-password-reset-link")
                 .param("email", TOM_EMAIL)
-                .header(HttpHeaders.HOST, webWolfHost + ":" + webWolfPort))
+                .header(HttpHeaders.HOST, URI.create(webGoatURL).getAuthority()))
         .andExpect(status().isOk());
 
     String token = ResetLinkAssignment.resetLinks.keySet().iterator().next();
@@ -157,22 +157,19 @@ class ResetLinkAssignmentTest extends LessonTest {
     Assertions.assertThat(mail.getValue().getContents())
         .contains(webGoatURL + "/PasswordReset/reset/reset-password/" + token)
         .doesNotContain(webWolfHost + ":" + webWolfPort);
+  }
 
-    ArgumentCaptor<String> landingUrl = ArgumentCaptor.forClass(String.class);
-    verify(restTemplate)
-        .exchange(
-            landingUrl.capture(), eq(HttpMethod.GET), any(HttpEntity.class), eq(Void.class));
-    String leakedLink = landingUrl.getValue().substring(landingUrl.getValue().lastIndexOf('/') + 1);
-    Assertions.assertThat(leakedLink).isNotEqualTo(token);
-    Assertions.assertThat(ResetLinkAssignment.resetLinks).doesNotContainKey(leakedLink);
-
+  @Test
+  void webWolfHostCannotIssueOrExposeTomsToken() throws Exception {
     mockMvc
         .perform(
-            MockMvcRequestBuilders.post("/PasswordReset/reset/change-password")
-                .param("resetLink", leakedLink)
-                .param("password", "attacker-password"))
+            MockMvcRequestBuilders.post("/PasswordReset/ForgotPassword/create-password-reset-link")
+                .param("email", TOM_EMAIL)
+                .header(HttpHeaders.HOST, webWolfHost + ":" + webWolfPort))
         .andExpect(status().isOk())
-        .andExpect(view().name("lessons/passwordreset/templates/password_link_not_found.html"));
+        .andExpect(jsonPath("$.lessonCompleted", CoreMatchers.is(false)));
+    Assertions.assertThat(ResetLinkAssignment.resetLinks).isEmpty();
+    verifyNoInteractions(restTemplate);
     mockMvc
         .perform(
             MockMvcRequestBuilders.post("/PasswordReset/reset/login")
