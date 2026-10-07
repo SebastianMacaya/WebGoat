@@ -4,8 +4,6 @@
  */
 package org.owasp.webgoat.integration;
 
-import static org.hamcrest.CoreMatchers.containsString;
-
 import io.restassured.RestAssured;
 import io.restassured.http.ContentType;
 import java.util.HashMap;
@@ -59,9 +57,7 @@ public class SqlInjectionMitigationIntegrationTest extends IntegrationTest {
         .relaxedHTTPSValidation()
         .cookie("JSESSIONID", getWebGoatCookie())
         .contentType(ContentType.JSON)
-        .get(
-                webGoatUrlConfig.url("SqlInjectionMitigations/servers?column=(case when (true) then hostname"
-                        + " else id end)"))
+        .get(webGoatUrlConfig.url("SqlInjectionMitigations/servers?column=hostname"))
         .then()
         .statusCode(200);
 
@@ -70,14 +66,20 @@ public class SqlInjectionMitigationIntegrationTest extends IntegrationTest {
         .relaxedHTTPSValidation()
         .cookie("JSESSIONID", getWebGoatCookie())
         .contentType(ContentType.JSON)
+        .get(
+            webGoatUrlConfig.url("SqlInjectionMitigations/servers?column=(case when (true) then hostname"
+                + " else id end)"))
+        .then()
+        .statusCode(400);
+
+      RestAssured.given()
+        .when()
+        .relaxedHTTPSValidation()
+        .cookie("JSESSIONID", getWebGoatCookie())
+        .contentType(ContentType.JSON)
         .get(webGoatUrlConfig.url("SqlInjectionMitigations/servers?column=unknown"))
         .then()
-        .statusCode(500)
-        .body(
-            "trace",
-            containsString(
-                "select id, hostname, ip, mac, status, description from SERVERS where status <>"
-                    + " 'out of order' order by"));
+        .statusCode(400);
 
     params.clear();
     params.put("ip", "104.130.219.202");
