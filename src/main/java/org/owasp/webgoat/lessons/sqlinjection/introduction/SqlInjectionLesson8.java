@@ -46,43 +46,40 @@ public class SqlInjectionLesson8 implements AssignmentEndpoint {
 
   protected AttackResult injectableQueryConfidentiality(String name, String auth_tan) {
     StringBuilder output = new StringBuilder();
-    String query =
-        "SELECT * FROM employees WHERE last_name = '"
-            + name
-            + "' AND auth_tan = '"
-            + auth_tan
-            + "'";
+    String query = "SELECT * FROM employees WHERE last_name = ? AND auth_tan = ?";
 
     try (Connection connection = dataSource.getConnection()) {
-      try {
-        Statement statement =
-            connection.createStatement(
-                ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_UPDATABLE);
-        log(connection, query);
-        ResultSet results = statement.executeQuery(query);
+      try (PreparedStatement statement =
+          connection.prepareStatement(
+              query, ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY)) {
+        statement.setString(1, name);
+        statement.setString(2, auth_tan);
+        log(connection, "employee lookup");
+        try (ResultSet results = statement.executeQuery()) {
 
-        if (results.getStatement() != null) {
-          if (results.first()) {
-            output.append(generateTable(results));
-            results.last();
+          if (results.getStatement() != null) {
+            if (results.first()) {
+              output.append(generateTable(results));
+              results.last();
 
-            if (results.getRow() > 1) {
-              // more than one record, the user succeeded
-              return success(this)
-                  .feedback("sql-injection.8.success")
-                  .output(output.toString())
-                  .build();
+              if (results.getRow() > 1) {
+                // more than one record, the user succeeded
+                return success(this)
+                    .feedback("sql-injection.8.success")
+                    .output(output.toString())
+                    .build();
+              } else {
+                // only one record
+                return failed(this).feedback("sql-injection.8.one").output(output.toString()).build();
+              }
+
             } else {
-              // only one record
-              return failed(this).feedback("sql-injection.8.one").output(output.toString()).build();
+              // no results
+              return failed(this).feedback("sql-injection.8.no.results").build();
             }
-
           } else {
-            // no results
-            return failed(this).feedback("sql-injection.8.no.results").build();
+            return failed(this).build();
           }
-        } else {
-          return failed(this).build();
         }
       } catch (SQLException e) {
         return failed(this)
