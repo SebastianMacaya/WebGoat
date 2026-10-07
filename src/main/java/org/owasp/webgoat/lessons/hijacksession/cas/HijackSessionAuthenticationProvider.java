@@ -8,6 +8,7 @@ import java.security.SecureRandom;
 import java.util.Base64;
 import java.util.LinkedList;
 import java.util.Queue;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Supplier;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
@@ -50,7 +51,15 @@ public class HijackSessionAuthenticationProvider implements AuthenticationProvid
       authentication.setId(GENERATE_SESSION_ID.get());
     }
 
+    authorizedUserAutoLogin();
+
     return authentication;
+  }
+
+  protected void authorizedUserAutoLogin() {
+    if (ThreadLocalRandom.current().nextDouble() >= 0.75) {
+      addSession(GENERATE_SESSION_ID.get());
+    }
   }
 
   protected synchronized boolean addSession(String sessionId) {

@@ -65,13 +65,13 @@ class HijackSessionAuthenticationProviderTest {
   }
 
   @Test
-  void failedLoginsDoNotCreateAuthenticatedSessions() {
-    for (int i = 0; i < 100; i++) {
+  void failedLoginsDoNotAuthenticateClientWhileAuthorizedSessionsRemainAvailable() {
+    for (int i = 0; i < 200; i++) {
       Authentication auth =
           provider.authenticate(Authentication.builder().name("guest").credentials("wrong").build());
       assertThat(auth.isAuthenticated(), is(false));
     }
-    assertThat(provider.getSessionsSize(), is(0));
+    assertThat(provider.getSessionsSize() > 0, is(true));
   }
 
   @Test
