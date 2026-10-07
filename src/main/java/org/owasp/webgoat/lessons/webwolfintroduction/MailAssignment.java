@@ -7,8 +7,8 @@ package org.owasp.webgoat.lessons.webwolfintroduction;
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.failed;
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.informationMessage;
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.success;
+import static org.owasp.webgoat.lessons.webwolfintroduction.VerificationCodes.Purpose.MAIL;
 
-import org.apache.commons.lang3.StringUtils;
 import org.owasp.webgoat.container.CurrentUsername;
 import org.owasp.webgoat.container.assignments.AssignmentEndpoint;
 import org.owasp.webgoat.container.assignments.AttackResult;
@@ -28,12 +28,16 @@ import org.springframework.web.client.RestTemplate;
 public class MailAssignment implements AssignmentEndpoint {
 
   private final String webWolfURL;
-  private RestTemplate restTemplate;
+  private final RestTemplate restTemplate;
+  private final VerificationCodes verificationCodes;
 
   public MailAssignment(
-      RestTemplate restTemplate, @Value("${webwolf.mail.url}") String webWolfURL) {
+      RestTemplate restTemplate,
+      @Value("${webwolf.mail.url}") String webWolfURL,
+      VerificationCodes verificationCodes) {
     this.restTemplate = restTemplate;
     this.webWolfURL = webWolfURL;
+    this.verificationCodes = verificationCodes;
   }
 
   @PostMapping("/WebWolf/mail/send")
@@ -42,13 +46,13 @@ public class MailAssignment implements AssignmentEndpoint {
       @RequestParam String email, @CurrentUsername String webGoatUsername) {
     String username = email.substring(0, email.indexOf("@"));
     if (username.equalsIgnoreCase(webGoatUsername)) {
+      String code = verificationCodes.issue(webGoatUsername, MAIL);
       Email mailEvent =
           Email.builder()
-              .recipient(username)
+              .recipient(webGoatUsername)
               .title("Test messages from WebWolf")
               .contents(
-                  "This is a test message from WebWolf, your unique code is: "
-                      + StringUtils.reverse(username))
+                  "This is a test message from WebWolf, your unique code is: " + code)
               .sender("webgoat@owasp.org")
               .build();
       try {
@@ -71,7 +75,7 @@ public class MailAssignment implements AssignmentEndpoint {
   @PostMapping("/WebWolf/mail")
   @ResponseBody
   public AttackResult completed(@RequestParam String uniqueCode, @CurrentUsername String username) {
-    if (uniqueCode.equals(StringUtils.reverse(username))) {
+    if (verificationCodes.consume(username, MAIL, uniqueCode)) {
       return success(this).build();
     } else {
       return failed(this).feedbackArgs("webwolf.code_incorrect").feedbackArgs(uniqueCode).build();
