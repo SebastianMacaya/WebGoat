@@ -80,7 +80,7 @@ class IDORAccessControlTest extends LessonTest {
                 .session(session)
                 .param("url", "WebGoat/IDOR/profile/2342384"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.lessonCompleted").value(true))
+        .andExpect(jsonPath("$.lessonCompleted").value(false))
         .andExpect(jsonPath("$.output", not(containsString("userId"))));
     mockMvc
         .perform(
@@ -94,14 +94,16 @@ class IDORAccessControlTest extends LessonTest {
             MockMvcRequestBuilders.post("/IDOR/profile/alt-path")
                 .session(session)
                 .param("url", "WebGoat/IDOR/profile/2342388"))
-        .andExpect(status().isForbidden());
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.lessonCompleted").value(false));
     mockMvc
         .perform(MockMvcRequestBuilders.get("/IDOR/profile/2342384").session(session))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.output", not(containsString("role"))));
     mockMvc
         .perform(MockMvcRequestBuilders.get("/IDOR/profile/2342388").session(session))
-        .andExpect(status().isForbidden());
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.lessonCompleted").value(false));
   }
 
   @Test
@@ -115,7 +117,8 @@ class IDORAccessControlTest extends LessonTest {
                 .session(session)
                 .contentType("application/json")
                 .content("{\"userId\":\"2342388\",\"color\":\"red\",\"role\":1}"))
-        .andExpect(status().isForbidden());
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.lessonCompleted").value(false));
     mockMvc
         .perform(
             MockMvcRequestBuilders.put("/IDOR/profile/2342384")
@@ -151,6 +154,22 @@ class IDORAccessControlTest extends LessonTest {
                 .session(session)
                 .param("username", "bill")
                 .param("password", "buffalo"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.lessonCompleted").value(false));
+    mockMvc
+        .perform(MockMvcRequestBuilders.get("/IDOR/profile").session(session))
+        .andExpect(status().isUnauthorized());
+  }
+
+  @Test
+  void publicTomCredentialsDoNotAuthenticateAnotherAccount() throws Exception {
+    MockHttpSession session = new MockHttpSession();
+    mockMvc
+        .perform(
+            MockMvcRequestBuilders.post("/IDOR/login")
+                .session(session)
+                .param("username", "tom")
+                .param("password", "cat"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.lessonCompleted").value(false));
     mockMvc
@@ -228,8 +247,8 @@ class IDORAccessControlTest extends LessonTest {
         .perform(
             MockMvcRequestBuilders.post("/IDOR/login")
                 .session(session)
-                .param("username", "tom")
-                .param("password", "cat"))
+                .param("username", "test")
+                .param("password", "password"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.lessonCompleted").value(true));
   }

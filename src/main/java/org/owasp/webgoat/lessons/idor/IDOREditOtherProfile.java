@@ -43,7 +43,10 @@ public class IDOREditOtherProfile implements AssignmentEndpoint {
   @ResponseBody
   public AttackResult completed(
       @PathVariable("userId") String userId, @RequestBody UserProfile userSubmittedProfile) {
-    IDORAccessPolicy.requireProfileAccess(userSessionData, userId);
+    String ownId = IDORAccessPolicy.requireLessonUserId(userSessionData);
+    if (!ownId.equals(userId) && !IDORAccessPolicy.isWebGoatAdmin()) {
+      return failed(this).feedback("idor.edit.profile.failure4").build();
+    }
     if (userSubmittedProfile.getUserId() != null
         && !userId.equals(userSubmittedProfile.getUserId())) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
@@ -59,8 +62,7 @@ public class IDOREditOtherProfile implements AssignmentEndpoint {
     }
     userSessionData.setValue("idor-profile-" + userId, profile);
 
-    if (IDORAccessPolicy.isWebGoatAdmin()
-        && !IDORAccessPolicy.requireLessonUserId(userSessionData).equals(userId)) {
+    if (IDORAccessPolicy.isWebGoatAdmin() && !ownId.equals(userId)) {
       return success(this)
           .feedback("idor.edit.profile.success1")
           .output(profile.profileToMap().toString())

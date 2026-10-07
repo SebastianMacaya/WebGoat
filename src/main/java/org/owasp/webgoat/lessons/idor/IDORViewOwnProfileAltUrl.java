@@ -5,18 +5,15 @@
 package org.owasp.webgoat.lessons.idor;
 
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.failed;
-import static org.owasp.webgoat.container.assignments.AttackResultBuilder.success;
 
 import org.owasp.webgoat.container.assignments.AssignmentEndpoint;
 import org.owasp.webgoat.container.assignments.AssignmentHints;
 import org.owasp.webgoat.container.assignments.AttackResult;
 import org.owasp.webgoat.container.session.LessonSession;
-import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.server.ResponseStatusException;
 
 @RestController
 @AssignmentHints({
@@ -38,14 +35,10 @@ public class IDORViewOwnProfileAltUrl implements AssignmentEndpoint {
     String profilePrefix = "WebGoat/IDOR/profile/";
     if ((profilePrefix + ownId).equals(url)) {
       UserProfile profile = IDORAccessPolicy.getProfile(userSessionData, ownId);
-      return success(this)
-          .feedback("idor.view.own.profile.success")
+      return failed(this)
+          .feedback("idor.view.own.profile.failure1")
           .output(profile.publicProfileToMap().toString())
           .build();
-    }
-    if (url.startsWith(profilePrefix)
-        && !url.substring(profilePrefix.length()).contains("/")) {
-      throw new ResponseStatusException(HttpStatus.FORBIDDEN);
     }
     return failed(this).feedback("idor.view.own.profile.failure1").build();
   }

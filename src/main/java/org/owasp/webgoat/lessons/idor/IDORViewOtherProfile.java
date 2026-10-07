@@ -41,9 +41,12 @@ public class IDORViewOtherProfile implements AssignmentEndpoint {
       produces = {"application/json"})
   @ResponseBody
   public AttackResult completed(@PathVariable("userId") String userId) {
-    IDORAccessPolicy.requireProfileAccess(userSessionData, userId);
+    String ownId = IDORAccessPolicy.requireLessonUserId(userSessionData);
+    if (!ownId.equals(userId) && !IDORAccessPolicy.isWebGoatAdmin()) {
+      return failed(this).feedback("idor.view.profile.close1").build();
+    }
     UserProfile profile = IDORAccessPolicy.getProfile(userSessionData, userId);
-    if (IDORAccessPolicy.requireLessonUserId(userSessionData).equals(userId)) {
+    if (ownId.equals(userId)) {
       return failed(this)
           .feedback("idor.view.profile.close2")
           .output(profile.publicProfileToMap().toString())

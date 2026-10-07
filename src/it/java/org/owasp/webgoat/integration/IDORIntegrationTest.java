@@ -5,6 +5,7 @@
 package org.owasp.webgoat.integration;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.is;
 
 import io.restassured.RestAssured;
 import io.restassured.http.ContentType;
@@ -30,7 +31,9 @@ public class IDORIntegrationTest extends IntegrationTest {
         .statusCode(HttpStatus.SC_UNAUTHORIZED);
 
     checkAssignment(
-        webGoatUrlConfig.url("IDOR/login"), Map.of("username", "tom", "password", "cat"), true);
+        webGoatUrlConfig.url("IDOR/login"), Map.of("username", "tom", "password", "cat"), false);
+    checkAssignment(
+        webGoatUrlConfig.url("IDOR/login"), Map.of("username", getUser(), "password", "password"), true);
 
     Map<String, Object> ownProfile =
         RestAssured.given()
@@ -61,7 +64,7 @@ public class IDORIntegrationTest extends IntegrationTest {
     checkAssignment(
         webGoatUrlConfig.url("IDOR/profile/alt-path"),
         Map.of("url", "WebGoat/IDOR/profile/2342384"),
-        true);
+        false);
 
     RestAssured.given()
         .relaxedHTTPSValidation()
@@ -69,13 +72,15 @@ public class IDORIntegrationTest extends IntegrationTest {
         .formParam("url", "WebGoat/IDOR/profile/2342388")
         .post(webGoatUrlConfig.url("IDOR/profile/alt-path"))
         .then()
-        .statusCode(HttpStatus.SC_FORBIDDEN);
+        .statusCode(HttpStatus.SC_OK)
+        .body("lessonCompleted", is(false));
     RestAssured.given()
         .relaxedHTTPSValidation()
         .cookie("JSESSIONID", getWebGoatCookie())
         .get(webGoatUrlConfig.url("IDOR/profile/2342388"))
         .then()
-        .statusCode(HttpStatus.SC_FORBIDDEN);
+        .statusCode(HttpStatus.SC_OK)
+        .body("lessonCompleted", is(false));
     RestAssured.given()
         .relaxedHTTPSValidation()
         .cookie("JSESSIONID", getWebGoatCookie())
@@ -85,6 +90,7 @@ public class IDORIntegrationTest extends IntegrationTest {
                 + "\"userId\":\"2342388\"}")
         .put(webGoatUrlConfig.url("IDOR/profile/2342388"))
         .then()
-        .statusCode(HttpStatus.SC_FORBIDDEN);
+        .statusCode(HttpStatus.SC_OK)
+        .body("lessonCompleted", is(false));
   }
 }

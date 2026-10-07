@@ -11,6 +11,8 @@ import org.owasp.webgoat.container.assignments.AssignmentEndpoint;
 import org.owasp.webgoat.container.assignments.AssignmentHints;
 import org.owasp.webgoat.container.assignments.AttackResult;
 import org.owasp.webgoat.container.session.LessonSession;
+import org.owasp.webgoat.container.users.WebGoatUser;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
@@ -35,9 +37,12 @@ public class IDORLogin implements AssignmentEndpoint {
     lessonSession.setValue("idor-profile-2342384", null);
     lessonSession.setValue("idor-profile-2342388", null);
 
-    if ("tom".equals(username) && "cat".equals(password)) {
+    Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+    if (principal instanceof WebGoatUser account
+        && webGoatUsername.equals(username)
+        && account.getPassword().equals(password)) {
       lessonSession.setValue("idor-webgoat-user", webGoatUsername);
-      lessonSession.setValue("idor-authenticated-as", username);
+      lessonSession.setValue("idor-authenticated-as", "tom");
       lessonSession.setValue("idor-authenticated-user-id", IDORAccessPolicy.TOM_ID);
       return success(this).feedback("idor.login.success").feedbackArgs(username).build();
     }
