@@ -46,6 +46,7 @@ public class ResetLinkAssignment implements AssignmentEndpoint {
   private static final String VIEW_FORMATTER = "lessons/passwordreset/templates/%s.html";
   static final String PASSWORD_TOM_9 =
       "somethingVeryRandomWhichNoOneWillEverTypeInAsPasswordForTom";
+  static final String TOM_USERNAME = "tom";
   static final String TOM_EMAIL = "tom@webgoat-cloud.org";
   static final Duration RESET_LINK_LIFETIME = Duration.ofMinutes(10);
   static final Map<String, ResetLink> resetLinks = new ConcurrentHashMap<>();
@@ -71,7 +72,7 @@ public class ResetLinkAssignment implements AssignmentEndpoint {
   @ResponseBody
   public AttackResult login(
       @RequestParam String password, @RequestParam String email, @CurrentUsername String username) {
-    if (TOM_EMAIL.equals(email)) {
+    if (TOM_EMAIL.equals(email) && TOM_USERNAME.equals(username)) {
       String passwordTom = usersToTomPassword.getOrDefault(username, PASSWORD_TOM_9);
       if (passwordTom.equals(PASSWORD_TOM_9)) {
         return failed(this).feedback("login_failed").build();
@@ -145,6 +146,6 @@ public class ResetLinkAssignment implements AssignmentEndpoint {
     }
     String email = resetLink.email();
     return (username + "@webgoat.org").equalsIgnoreCase(email)
-        || ("tom".equalsIgnoreCase(username) && TOM_EMAIL.equalsIgnoreCase(email));
+        || (TOM_USERNAME.equalsIgnoreCase(username) && TOM_EMAIL.equalsIgnoreCase(email));
   }
 }

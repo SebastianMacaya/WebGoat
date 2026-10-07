@@ -49,6 +49,7 @@ class ResetLinkAssignmentTest extends LessonTest {
   private String webWolfPort;
 
   @Autowired private ResourceLoader resourceLoader;
+  @Autowired private ResetLinkAssignment resetLinkAssignment;
   @MockBean private RestTemplate restTemplate;
 
   @BeforeEach
@@ -233,6 +234,15 @@ class ResetLinkAssignmentTest extends LessonTest {
   }
 
   @Test
+  void attackerSessionCannotValidateTomsLogin() {
+    // A legacy session entry must not be treated as Tom's account password.
+    ResetLinkAssignment.usersToTomPassword.put("attacker", "newpass");
+
+    Assertions.assertThat(resetLinkAssignment.login("newpass", TOM_EMAIL, "attacker").isLessonCompleted())
+        .isFalse();
+  }
+
+  @Test
   @WithWebGoatUser(username = "tom")
   void tomsLinkChangesHisPasswordOnlyOnce() throws Exception {
     String token = "verified-tom-token";
@@ -247,6 +257,9 @@ class ResetLinkAssignmentTest extends LessonTest {
         .andExpect(status().isOk())
         .andExpect(view().name("lessons/passwordreset/templates/success.html"));
     Assertions.assertThat(ResetLinkAssignment.usersToTomPassword).containsEntry("tom", "newpass");
+
+    Assertions.assertThat(resetLinkAssignment.login("newpass", TOM_EMAIL, "tom").isLessonCompleted())
+        .isTrue();
 
     mockMvc
         .perform(
