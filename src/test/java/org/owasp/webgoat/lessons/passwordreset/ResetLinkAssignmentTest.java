@@ -8,6 +8,7 @@ import static org.owasp.webgoat.lessons.passwordreset.ResetLinkAssignment.TOM_EM
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -100,7 +101,7 @@ class ResetLinkAssignmentTest extends LessonTest {
     mockMvc
         .perform(
             MockMvcRequestBuilders.post("/PasswordReset/ForgotPassword/create-password-reset-link")
-                .param("email", TOM_EMAIL)
+                .param("email", "test@webgoat.org")
                 .header(HttpHeaders.HOST, "attacker.example:9090"))
         .andExpect(status().isOk());
     Assertions.assertThat(ResetLinkAssignment.resetLinks).isNotEmpty();
@@ -125,7 +126,7 @@ class ResetLinkAssignmentTest extends LessonTest {
     mockMvc
         .perform(
             MockMvcRequestBuilders.post("/PasswordReset/ForgotPassword/create-password-reset-link")
-                .param("email", TOM_EMAIL)
+                .param("email", "test@webgoat.org")
                 .header(HttpHeaders.HOST, "attacker.example:9090"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.lessonCompleted", CoreMatchers.is(false)));
@@ -133,14 +134,14 @@ class ResetLinkAssignmentTest extends LessonTest {
     String token = ResetLinkAssignment.resetLinks.keySet().iterator().next();
     ArgumentCaptor<PasswordResetEmail> mail = ArgumentCaptor.forClass(PasswordResetEmail.class);
     verify(restTemplate).postForEntity(eq(webWolfMailURL), mail.capture(), eq(Object.class));
-    Assertions.assertThat(mail.getValue().getRecipient()).isEqualTo("tom");
+    Assertions.assertThat(mail.getValue().getRecipient()).isEqualTo("test");
     Assertions.assertThat(mail.getValue().getContents())
         .contains(webGoatURL + "/PasswordReset/reset/reset-password/" + token)
         .doesNotContain("attacker.example");
   }
 
   @Test
-  void webWolfHostHeaderDoesNotExposeTomsLink() throws Exception {
+  void unverifiedTomRequestDoesNotIssueALink() throws Exception {
     mockMvc
         .perform(
             MockMvcRequestBuilders.post("/PasswordReset/ForgotPassword/create-password-reset-link")
@@ -148,11 +149,8 @@ class ResetLinkAssignmentTest extends LessonTest {
                 .header(HttpHeaders.HOST, webWolfHost + ":" + webWolfPort))
         .andExpect(status().isOk());
 
-    verify(restTemplate)
-        .postForEntity(eq(webWolfMailURL), any(PasswordResetEmail.class), eq(Object.class));
-    Assertions.assertThat(ResetLinkAssignment.resetLinks.values())
-        .extracting(ResetLinkAssignment.ResetLink::email)
-        .containsExactly(TOM_EMAIL);
+    verifyNoInteractions(restTemplate);
+    Assertions.assertThat(ResetLinkAssignment.resetLinks).isEmpty();
   }
 
   @Test
@@ -160,7 +158,7 @@ class ResetLinkAssignmentTest extends LessonTest {
     mockMvc
         .perform(
             MockMvcRequestBuilders.post("/PasswordReset/ForgotPassword/create-password-reset-link")
-                .param("email", "alice@webgoat.org"))
+                .param("email", "test@webgoat.org"))
         .andExpect(status().isOk());
     String token = ResetLinkAssignment.resetLinks.keySet().iterator().next();
 
@@ -184,12 +182,9 @@ class ResetLinkAssignmentTest extends LessonTest {
 
   @Test
   void tomsLinkChangesHisPasswordOnlyOnce() throws Exception {
-    mockMvc
-        .perform(
-            MockMvcRequestBuilders.post("/PasswordReset/ForgotPassword/create-password-reset-link")
-                .param("email", TOM_EMAIL))
-        .andExpect(status().isOk());
-    String token = ResetLinkAssignment.resetLinks.keySet().iterator().next();
+    String token = "verified-tom-token";
+    ResetLinkAssignment.resetLinks.put(
+        token, new ResetLinkAssignment.ResetLink(TOM_EMAIL, Instant.now().plusSeconds(60)));
 
     mockMvc
         .perform(
@@ -235,7 +230,7 @@ class ResetLinkAssignmentTest extends LessonTest {
     mockMvc
         .perform(
             MockMvcRequestBuilders.post("/PasswordReset/ForgotPassword/create-password-reset-link")
-                .param("email", TOM_EMAIL))
+                .param("email", "test@webgoat.org"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.lessonCompleted", CoreMatchers.is(false)));
     Assertions.assertThat(ResetLinkAssignment.resetLinks).isEmpty();

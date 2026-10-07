@@ -10,6 +10,7 @@ import static org.owasp.webgoat.container.assignments.AttackResultBuilder.inform
 import java.time.Instant;
 import java.util.Locale;
 import java.util.UUID;
+import org.owasp.webgoat.container.CurrentUsername;
 import org.owasp.webgoat.container.assignments.AssignmentEndpoint;
 import org.owasp.webgoat.container.assignments.AttackResult;
 import org.springframework.beans.factory.annotation.Value;
@@ -43,8 +44,15 @@ public class ResetLinkAssignmentForgotPassword implements AssignmentEndpoint {
 
   @PostMapping("/PasswordReset/ForgotPassword/create-password-reset-link")
   @ResponseBody
-  public AttackResult sendPasswordResetLink(@RequestParam String email) {
+  public AttackResult sendPasswordResetLink(
+      @RequestParam String email, @CurrentUsername String username) {
     String normalizedEmail = email.trim().toLowerCase(Locale.ROOT);
+    String ownMailbox = username.toLowerCase(Locale.ROOT) + "@webgoat.org";
+    if (!ownMailbox.equals(normalizedEmail)) {
+      // No verified account owns this address. Keep the response indistinguishable while
+      // withholding a token from someone who can claim an arbitrary WebWolf mailbox name.
+      return informationMessage(this).feedback("email.send").feedbackArgs(email).build();
+    }
     String resetLink = UUID.randomUUID().toString();
     ResetLinkAssignment.resetLinks.put(
         resetLink,
