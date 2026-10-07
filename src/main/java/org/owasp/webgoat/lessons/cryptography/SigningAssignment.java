@@ -11,6 +11,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.nio.charset.StandardCharsets;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.NoSuchAlgorithmException;
+import java.security.KeyPair;
 import java.security.PublicKey;
 import java.security.interfaces.RSAPublicKey;
 import java.util.Base64;
@@ -19,14 +20,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.owasp.webgoat.container.assignments.AssignmentEndpoint;
 import org.owasp.webgoat.container.assignments.AssignmentHints;
 import org.owasp.webgoat.container.assignments.AttackResult;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.server.ResponseStatusException;
 
 @RestController
 @AssignmentHints({
@@ -42,13 +41,25 @@ public class SigningAssignment implements AssignmentEndpoint {
 
   @GetMapping(path = "/crypto/signing/getprivate", produces = MediaType.TEXT_PLAIN_VALUE)
   @ResponseBody
-  public String getPrivateKey() {
-    throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Private keys are not available");
+  public String getPrivateKey(HttpServletRequest request)
+      throws NoSuchAlgorithmException, InvalidAlgorithmParameterException {
+    trustedPublicKey(request);
+    KeyPair practiceKey = CryptoUtil.generateKeyPair();
+    return CryptoUtil.getPrivateKeyInPEM(practiceKey);
   }
 
   @GetMapping(path = "/crypto/signing/getpublic", produces = MediaType.TEXT_PLAIN_VALUE)
   @ResponseBody
   public String getPublicKey(HttpServletRequest request)
+      throws NoSuchAlgorithmException, InvalidAlgorithmParameterException {
+    PublicKey publicKey = trustedPublicKey(request);
+    return "-----BEGIN PUBLIC KEY-----\n"
+        + Base64.getMimeEncoder(64, "\n".getBytes(StandardCharsets.US_ASCII))
+            .encodeToString(publicKey.getEncoded())
+        + "\n-----END PUBLIC KEY-----\n";
+  }
+
+  private PublicKey trustedPublicKey(HttpServletRequest request)
       throws NoSuchAlgorithmException, InvalidAlgorithmParameterException {
     PublicKey publicKey =
         (PublicKey) request.getSession().getAttribute(PUBLIC_KEY_SESSION_ATTRIBUTE);
@@ -56,10 +67,7 @@ public class SigningAssignment implements AssignmentEndpoint {
       publicKey = CryptoUtil.generateKeyPair().getPublic();
       request.getSession().setAttribute(PUBLIC_KEY_SESSION_ATTRIBUTE, publicKey);
     }
-    return "-----BEGIN PUBLIC KEY-----\n"
-        + Base64.getMimeEncoder(64, "\n".getBytes(StandardCharsets.US_ASCII))
-            .encodeToString(publicKey.getEncoded())
-        + "\n-----END PUBLIC KEY-----\n";
+    return publicKey;
   }
 
   @PostMapping("/crypto/signing/verify")

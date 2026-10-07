@@ -11,6 +11,7 @@ import java.nio.charset.Charset;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.KeyFactory;
 import java.security.NoSuchAlgorithmException;
+import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.interfaces.RSAPublicKey;
 import java.security.spec.InvalidKeySpecException;
@@ -125,12 +126,15 @@ public class CryptoIntegrationTest extends IntegrationTest {
   private void checkAssignmentSigning()
       throws NoSuchAlgorithmException, InvalidKeySpecException, InvalidAlgorithmParameterException {
 
-    RestAssured.given()
+    String practicePem = RestAssured.given()
         .relaxedHTTPSValidation()
         .cookie("JSESSIONID", getWebGoatCookie())
         .get(webGoatUrlConfig.url("crypto/signing/getprivate"))
         .then()
-        .statusCode(403);
+        .statusCode(200)
+        .extract()
+        .asString();
+    PrivateKey practiceKey = CryptoUtil.getPrivateKeyFromPEM(practicePem);
 
       String publicPEM =
         RestAssured.given()
@@ -151,7 +155,7 @@ public class CryptoIntegrationTest extends IntegrationTest {
         KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(encodedPublicKey));
     String modulus =
         DatatypeConverter.printHexBinary(((RSAPublicKey) publicKey).getModulus().toByteArray());
-    String signature = CryptoUtil.signMessage(modulus, CryptoUtil.generateKeyPair().getPrivate());
+    String signature = CryptoUtil.signMessage(modulus, practiceKey);
     Map<String, Object> params = new HashMap<>();
     params.clear();
     params.put("modulus", modulus);

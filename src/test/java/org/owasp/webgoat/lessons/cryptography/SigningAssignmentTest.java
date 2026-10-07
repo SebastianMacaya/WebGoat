@@ -13,6 +13,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.security.KeyPair;
+import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.interfaces.RSAPublicKey;
 import javax.xml.bind.DatatypeConverter;
@@ -24,14 +25,19 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 class SigningAssignmentTest extends LessonTest {
 
   @Test
-  void privateKeyIsNotAvailableAndUnrelatedSignatureCannotVerify() throws Exception {
+  void practicePrivateKeyCannotSignForVerifier() throws Exception {
     MockHttpSession session = new MockHttpSession();
     KeyPair trustedSigner = CryptoUtil.generateKeyPair();
     session.setAttribute("signingPublicKey", trustedSigner.getPublic());
 
-    mockMvc
+    String practicePem = mockMvc
         .perform(MockMvcRequestBuilders.get("/crypto/signing/getprivate").session(session))
-        .andExpect(status().isForbidden());
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("-----BEGIN PRIVATE KEY-----")))
+        .andReturn()
+        .getResponse()
+        .getContentAsString();
+    PrivateKey practiceKey = CryptoUtil.getPrivateKeyFromPEM(practicePem);
     mockMvc
         .perform(MockMvcRequestBuilders.get("/crypto/signing/getpublic").session(session))
         .andExpect(status().isOk())
@@ -41,8 +47,7 @@ class SigningAssignmentTest extends LessonTest {
     String modulus =
         DatatypeConverter.printHexBinary(
             ((RSAPublicKey) trustedSigner.getPublic()).getModulus().toByteArray());
-    String forgedSignature =
-        CryptoUtil.signMessage(modulus, CryptoUtil.generateKeyPair().getPrivate());
+    String forgedSignature = CryptoUtil.signMessage(modulus, practiceKey);
 
     mockMvc
         .perform(
