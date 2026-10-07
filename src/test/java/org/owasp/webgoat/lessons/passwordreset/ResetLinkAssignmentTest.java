@@ -24,7 +24,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.core.io.ResourceLoader;
+import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -155,6 +157,28 @@ class ResetLinkAssignmentTest extends LessonTest {
     Assertions.assertThat(mail.getValue().getContents())
         .contains(webGoatURL + "/PasswordReset/reset/reset-password/" + token)
         .doesNotContain(webWolfHost + ":" + webWolfPort);
+
+    ArgumentCaptor<String> landingUrl = ArgumentCaptor.forClass(String.class);
+    verify(restTemplate)
+        .exchange(
+            landingUrl.capture(), eq(HttpMethod.GET), any(HttpEntity.class), eq(Void.class));
+    String leakedLink = landingUrl.getValue().substring(landingUrl.getValue().lastIndexOf('/') + 1);
+    Assertions.assertThat(leakedLink).isNotEqualTo(token);
+    Assertions.assertThat(ResetLinkAssignment.resetLinks).doesNotContainKey(leakedLink);
+
+    mockMvc
+        .perform(
+            MockMvcRequestBuilders.post("/PasswordReset/reset/change-password")
+                .param("resetLink", leakedLink)
+                .param("password", "attacker-password"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("lessons/passwordreset/templates/password_link_not_found.html"));
+    mockMvc
+        .perform(
+            MockMvcRequestBuilders.post("/PasswordReset/reset/login")
+                .param("email", TOM_EMAIL)
+                .param("password", "attacker-password"))
+        .andExpect(jsonPath("$.lessonCompleted", CoreMatchers.is(false)));
   }
 
   @Test
