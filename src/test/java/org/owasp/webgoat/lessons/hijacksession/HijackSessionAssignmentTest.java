@@ -4,6 +4,7 @@
  */
 package org.owasp.webgoat.lessons.hijacksession;
 
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.emptyString;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
@@ -58,6 +59,7 @@ class HijackSessionAssignmentTest extends LessonTest {
   @Test
   void testBlankCookie() throws Exception {
     lenient().when(authenticationMock.isAuthenticated()).thenReturn(false);
+    lenient().when(authenticationMock.getId()).thenReturn("random-session-id");
     lenient()
         .when(providerMock.authenticate(any(Authentication.class)))
         .thenReturn(authenticationMock);
@@ -68,6 +70,12 @@ class HijackSessionAssignmentTest extends LessonTest {
                 .param("password", "webgoat"));
 
     result.andExpect(cookie().value(COOKIE_NAME, not(emptyString())));
+    assertThat(
+        result.andReturn().getResponse().getCookie(COOKIE_NAME).isHttpOnly(),
+        CoreMatchers.is(true));
+    assertThat(
+        result.andReturn().getResponse().getCookie(COOKIE_NAME).getAttribute("SameSite"),
+        CoreMatchers.is("Strict"));
     result.andExpect(jsonPath("$.lessonCompleted", CoreMatchers.is(false)));
   }
 }

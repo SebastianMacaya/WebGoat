@@ -4,10 +4,10 @@
  */
 package org.owasp.webgoat.lessons.hijacksession.cas;
 
-import java.time.Instant;
+import java.security.SecureRandom;
+import java.util.Base64;
 import java.util.LinkedList;
 import java.util.Queue;
-import java.util.Random;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.DoublePredicate;
 import java.util.function.Supplier;
@@ -19,24 +19,26 @@ import org.springframework.web.context.annotation.ApplicationScope;
  * @author Angel Olle Blazquez
  */
 
-// weak id value and mechanism
-
 @ApplicationScope
 @Component
 public class HijackSessionAuthenticationProvider implements AuthenticationProvider<Authentication> {
 
-  private Queue<String> sessions = new LinkedList<>();
-  private static long id = new Random().nextLong() & Long.MAX_VALUE;
+  private final Queue<String> sessions = new LinkedList<>();
+  private static final SecureRandom SECURE_RANDOM = new SecureRandom();
   protected static final int MAX_SESSIONS = 50;
 
   private static final DoublePredicate PROBABILITY_DOUBLE_PREDICATE = pr -> pr < 0.75;
   private static final Supplier<String> GENERATE_SESSION_ID =
-      () -> ++id + "-" + Instant.now().toEpochMilli();
+      () -> {
+        byte[] bytes = new byte[32];
+        SECURE_RANDOM.nextBytes(bytes);
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+      };
   public static final Supplier<Authentication> AUTHENTICATION_SUPPLIER =
       () -> Authentication.builder().id(GENERATE_SESSION_ID.get()).build();
 
   @Override
-  public Authentication authenticate(Authentication authentication) {
+  public synchronized Authentication authenticate(Authentication authentication) {
     if (authentication == null) {
       return AUTHENTICATION_SUPPLIER.get();
     }
@@ -56,7 +58,7 @@ public class HijackSessionAuthenticationProvider implements AuthenticationProvid
     return authentication;
   }
 
-  protected void authorizedUserAutoLogin() {
+  protected synchronized void authorizedUserAutoLogin() {
     if (!PROBABILITY_DOUBLE_PREDICATE.test(ThreadLocalRandom.current().nextDouble())) {
       Authentication authentication = AUTHENTICATION_SUPPLIER.get();
       authentication.setAuthenticated(true);
@@ -64,14 +66,14 @@ public class HijackSessionAuthenticationProvider implements AuthenticationProvid
     }
   }
 
-  protected boolean addSession(String sessionId) {
+  protected synchronized boolean addSession(String sessionId) {
     if (sessions.size() >= MAX_SESSIONS) {
       sessions.remove();
     }
     return sessions.add(sessionId);
   }
 
-  protected int getSessionsSize() {
+  protected synchronized int getSessionsSize() {
     return sessions.size();
   }
 }

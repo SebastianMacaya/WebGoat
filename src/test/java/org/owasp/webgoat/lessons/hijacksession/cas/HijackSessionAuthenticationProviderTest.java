@@ -8,6 +8,8 @@ import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.CoreMatchers.not;
 import static org.hamcrest.MatcherAssert.assertThat;
 
+import java.util.HashSet;
+import java.util.Set;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.StringUtils;
 import org.junit.jupiter.api.DisplayName;
@@ -49,6 +51,17 @@ class HijackSessionAuthenticationProviderTest {
 
     assertThat(auth.getId(), is("otherId"));
     assertThat(auth.isAuthenticated(), is(false));
+  }
+
+  @Test
+  void generatedIdsUseIndependentRandomTokens() {
+    Set<String> ids = new HashSet<>();
+    for (int i = 0; i < 200; i++) {
+      String sessionId = HijackSessionAuthenticationProvider.AUTHENTICATION_SUPPLIER.get().getId();
+      assertThat(sessionId.matches("[A-Za-z0-9_-]{43}"), is(true));
+      ids.add(sessionId);
+    }
+    assertThat(ids.size(), is(200));
   }
 
   @Test
