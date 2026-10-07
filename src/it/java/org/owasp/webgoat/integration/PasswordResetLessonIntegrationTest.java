@@ -9,9 +9,11 @@ import static org.junit.jupiter.api.DynamicTest.dynamicTest;
 import io.restassured.RestAssured;
 import java.util.Arrays;
 import java.util.Map;
+import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.apache.commons.lang3.StringUtils;
 import org.assertj.core.api.Assertions;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.TestFactory;
@@ -28,7 +30,9 @@ public class PasswordResetLessonIntegrationTest extends IntegrationTest {
   Iterable<DynamicTest> passwordResetLesson() {
     return Arrays.asList(
         dynamicTest("assignment 6 - check email link", () -> sendEmailShouldBeAvailableInWebWolf()),
-        dynamicTest("assignment 6 - solve assignment", () -> solveAssignment()),
+        dynamicTest(
+            "assignment 6 - another account's link cannot reset Tom",
+            () -> anotherPersonsLinkCannotResetTom()),
         dynamicTest("assignment 2 - simple reset", () -> assignment2()),
         dynamicTest("assignment 4 - guess questions", () -> assignment4()),
         dynamicTest("assignment 5 - simple questions", () -> assignment5()));
@@ -67,23 +71,41 @@ public class PasswordResetLessonIntegrationTest extends IntegrationTest {
         true);
   }
 
-  public void solveAssignment() {
-    // WebGoat
-    clickForgotEmailLink("tom@webgoat-cloud.org");
-
-    // WebWolf
-    var link = getPasswordResetLinkFromLandingPage();
-    // WebGoat
-    changePassword(link);
-      checkAssignment(
-              webGoatUrlConfig.url("PasswordReset/reset/login"),
-        Map.of("email", "tom@webgoat-cloud.org", "password", "123456"),
-        true);
+  public void anotherPersonsLinkCannotResetTom() {
+    clickForgotEmailLink(this.getUser() + "@webgoat.org");
+    var link = getPasswordResetLinkFromMailbox();
+    String newPassword = "P" + UUID.randomUUID().toString().substring(0, 7);
+    Assertions.assertThat(changePassword(link, newPassword))
+        .contains("Password changed successfully");
+    checkAssignment(
+        webGoatUrlConfig.url("PasswordReset/reset/login"),
+        Map.of("email", "tom@webgoat-cloud.org", "password", newPassword),
+        false);
   }
 
   public void sendEmailShouldBeAvailableInWebWolf() {
     clickForgotEmailLink(this.getUser() + "@webgoat.org");
 
+    Assertions.assertThat(getLatestPasswordResetEmail())
+        .contains("Hi, you requested a password reset link")
+        .contains("/PasswordReset/reset/reset-password/")
+        .doesNotContain("attacker.example");
+  }
+
+  private String changePassword(String link, String password) {
+    return RestAssured.given()
+        .when()
+        .relaxedHTTPSValidation()
+        .cookie("JSESSIONID", getWebGoatCookie())
+        .formParams("resetLink", link, "password", password)
+        .post(webGoatUrlConfig.url("PasswordReset/reset/change-password"))
+        .then()
+        .statusCode(200)
+        .extract()
+        .asString();
+  }
+
+  private String getLatestPasswordResetEmail() {
     var responseBody =
         RestAssured.given()
             .when()
@@ -95,52 +117,23 @@ public class PasswordResetLessonIntegrationTest extends IntegrationTest {
             .response()
             .getBody()
             .asString();
-
-    Assertions.assertThat(responseBody).contains("Hi, you requested a password reset link");
+    Matcher message = Pattern.compile("(?s)<pre[^>]*>(.*?)</pre>").matcher(responseBody);
+    Assertions.assertThat(message.find()).isTrue();
+    return message.group(1);
   }
 
-  @AfterEach
-  public void shutdown() {
-    // this will run only once after the list of dynamic tests has run, this is to test if the
-    // lesson is marked complete
-    checkResults("PasswordReset");
-  }
-
-  private void changePassword(String link) {
-      RestAssured.given()
-        .when()
-        .relaxedHTTPSValidation()
-        .cookie("JSESSIONID", getWebGoatCookie())
-        .formParams("resetLink", link, "password", "123456")
-        .post(webGoatUrlConfig.url("PasswordReset/reset/change-password"))
-        .then()
-        .statusCode(200);
-  }
-
-  private String getPasswordResetLinkFromLandingPage() {
-    var responseBody =
-        RestAssured.given()
-            .when()
-            .relaxedHTTPSValidation()
-            .cookie("WEBWOLFSESSION", getWebWolfCookie())
-            .get(webWolfUrlConfig.url("requests"))
-            .then()
-            .extract()
-            .response()
-            .getBody()
-            .asString();
-    int startIndex = responseBody.lastIndexOf("/PasswordReset/reset/reset-password/");
-    var link =
-        responseBody.substring(
-            startIndex + "/PasswordReset/reset/reset-password/".length(),
-            responseBody.indexOf(",", startIndex) - 1);
-    return link;
+  private String getPasswordResetLinkFromMailbox() {
+    Matcher token =
+        Pattern.compile("/PasswordReset/reset/reset-password/([0-9a-f-]{36})")
+            .matcher(getLatestPasswordResetEmail());
+    Assertions.assertThat(token.find()).isTrue();
+    return token.group(1);
   }
 
   private void clickForgotEmailLink(String user) {
-      RestAssured.given()
+    RestAssured.given()
         .when()
-        .header(HttpHeaders.HOST, String.format("%s:%s", "127.0.0.1", webWolfUrlConfig.port()))
+        .header(HttpHeaders.HOST, "attacker.example")
         .relaxedHTTPSValidation()
         .cookie("JSESSIONID", getWebGoatCookie())
         .formParams("email", user)
