@@ -11,10 +11,10 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang3.StringUtils;
 import org.springframework.boot.actuate.web.exchanges.HttpExchange;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
+import org.springframework.web.util.UriComponentsBuilder;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.servlet.ModelAndView;
@@ -62,11 +62,11 @@ public class Requests {
     /* do not show certain traces to other users in a classroom setup */
     if (req.getUri().getPath().contains("/files") && !req.getUri().getPath().contains(username)) {
       allowed = false;
-    } else if (req.getUri().getPath().contains("/landing")
-        && req.getUri().getQuery() != null
-        && req.getUri().getQuery().contains("uniqueCode")
-        && !req.getUri().getQuery().contains(StringUtils.reverse(username))) {
-      allowed = false;
+    } else if (req.getUri().getPath().contains("/landing")) {
+      var queryParams = UriComponentsBuilder.fromUri(req.getUri()).build().getQueryParams();
+      if (queryParams.containsKey("uniqueCode")) {
+        allowed = username.equals(queryParams.getFirst("username"));
+      }
     }
 
     return allowed;
