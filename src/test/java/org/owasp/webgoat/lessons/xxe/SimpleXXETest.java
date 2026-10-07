@@ -8,10 +8,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import org.hamcrest.CoreMatchers;
+import org.hamcrest.Matchers;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.owasp.webgoat.WithWebGoatUser;
 import org.owasp.webgoat.container.plugins.LessonTest;
+import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
@@ -24,8 +26,7 @@ class SimpleXXETest extends LessonTest {
   }
 
   @Test
-  void workingAttack() throws Exception {
-    // Call with XXE injection
+  void externalEntityDoesNotSolveAssignment() throws Exception {
     mockMvc
         .perform(
             MockMvcRequestBuilders.post("/xxe/simple")
@@ -34,7 +35,24 @@ class SimpleXXETest extends LessonTest {
                         + " SYSTEM \"file:///\"> ]><comment><text>&root;</text></comment>"))
         .andExpect(status().isOk())
         .andExpect(
-            jsonPath("$.feedback", CoreMatchers.is(messages.getMessage("assignment.solved"))));
+            jsonPath("$.feedback", CoreMatchers.is(messages.getMessage("assignment.not.solved"))));
+  }
+
+  @Test
+  void postingBenignXmlShouldAddComment() throws Exception {
+    mockMvc
+        .perform(
+            MockMvcRequestBuilders.post("/xxe/simple")
+                .contentType(MediaType.APPLICATION_XML)
+                .content("<comment><text>A normal XML comment</text></comment>"))
+        .andExpect(status().isOk())
+        .andExpect(
+            jsonPath("$.feedback", CoreMatchers.is(messages.getMessage("assignment.not.solved"))));
+
+    mockMvc
+        .perform(MockMvcRequestBuilders.get("/xxe/comments").accept(MediaType.APPLICATION_JSON))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.[*].text").value(Matchers.hasItem("A normal XML comment")));
   }
 
   @Test

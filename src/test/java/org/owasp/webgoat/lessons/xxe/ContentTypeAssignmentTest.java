@@ -44,7 +44,7 @@ class ContentTypeAssignmentTest extends LessonTest {
   }
 
   @Test
-  void workingAttack() throws Exception {
+  void externalEntityDoesNotSolveAssignment() throws Exception {
     mockMvc
         .perform(
             MockMvcRequestBuilders.post("/xxe/content-type")
@@ -53,8 +53,24 @@ class ContentTypeAssignmentTest extends LessonTest {
                     "<?xml version=\"1.0\" standalone=\"yes\" ?><!DOCTYPE user [<!ENTITY root"
                         + " SYSTEM \"file:///\"> ]><comment><text>&root;</text></comment>"))
         .andExpect(status().isOk())
+        .andExpect(jsonPath("$.lessonCompleted", CoreMatchers.is(false)));
+  }
+
+  @Test
+  void postingBenignXmlShouldAddComment() throws Exception {
+    mockMvc
+        .perform(
+            MockMvcRequestBuilders.post("/xxe/content-type")
+                .contentType(MediaType.APPLICATION_XML)
+                .content("<comment><text>A normal content type comment</text></comment>"))
+        .andExpect(status().isOk())
         .andExpect(
-            jsonPath("$.feedback", CoreMatchers.is(messages.getMessage("assignment.solved"))));
+            jsonPath("$.feedback", CoreMatchers.is(messages.getMessage("assignment.not.solved"))));
+
+    mockMvc
+        .perform(get("/xxe/comments").accept(MediaType.APPLICATION_JSON))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.[*].text").value(Matchers.hasItem("A normal content type comment")));
   }
 
   @Test
