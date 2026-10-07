@@ -8,10 +8,13 @@ import static org.junit.jupiter.api.Assertions.fail;
 
 import io.restassured.RestAssured;
 import java.nio.charset.Charset;
+import java.security.InvalidAlgorithmParameterException;
+import java.security.KeyFactory;
 import java.security.NoSuchAlgorithmException;
-import java.security.PrivateKey;
-import java.security.interfaces.RSAPrivateKey;
+import java.security.PublicKey;
+import java.security.interfaces.RSAPublicKey;
 import java.security.spec.InvalidKeySpecException;
+import java.security.spec.X509EncodedKeySpec;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
@@ -46,7 +49,7 @@ public class CryptoIntegrationTest extends IntegrationTest {
 
     checkAssignmentDefaults();
 
-    checkResults("Cryptography");
+    // The signing exercise cannot be completed using a key disclosed by the verifier.
   }
 
   private void checkAssignment2() {
@@ -119,27 +122,41 @@ public class CryptoIntegrationTest extends IntegrationTest {
       checkAssignment(webGoatUrlConfig.url("crypto/hashing"), params, true);
   }
 
-  private void checkAssignmentSigning() throws NoSuchAlgorithmException, InvalidKeySpecException {
+  private void checkAssignmentSigning()
+      throws NoSuchAlgorithmException, InvalidKeySpecException, InvalidAlgorithmParameterException {
 
-      String privatePEM =
+    RestAssured.given()
+        .relaxedHTTPSValidation()
+        .cookie("JSESSIONID", getWebGoatCookie())
+        .get(webGoatUrlConfig.url("crypto/signing/getprivate"))
+        .then()
+        .statusCode(403);
+
+      String publicPEM =
         RestAssured.given()
             .when()
             .relaxedHTTPSValidation()
             .cookie("JSESSIONID", getWebGoatCookie())
-            .get(webGoatUrlConfig.url("crypto/signing/getprivate"))
+            .get(webGoatUrlConfig.url("crypto/signing/getpublic"))
             .then()
             .extract()
             .asString();
-    PrivateKey privateKey = CryptoUtil.getPrivateKeyFromPEM(privatePEM);
-
-    RSAPrivateKey privk = (RSAPrivateKey) privateKey;
-    String modulus = DatatypeConverter.printHexBinary(privk.getModulus().toByteArray());
-    String signature = CryptoUtil.signMessage(modulus, privateKey);
+    byte[] encodedPublicKey =
+        Base64.getMimeDecoder()
+            .decode(
+                publicPEM
+                    .replace("-----BEGIN PUBLIC KEY-----", "")
+                    .replace("-----END PUBLIC KEY-----", ""));
+    PublicKey publicKey =
+        KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(encodedPublicKey));
+    String modulus =
+        DatatypeConverter.printHexBinary(((RSAPublicKey) publicKey).getModulus().toByteArray());
+    String signature = CryptoUtil.signMessage(modulus, CryptoUtil.generateKeyPair().getPrivate());
     Map<String, Object> params = new HashMap<>();
     params.clear();
     params.put("modulus", modulus);
     params.put("signature", signature);
-      checkAssignment(webGoatUrlConfig.url("crypto/signing/verify"), params, true);
+      checkAssignment(webGoatUrlConfig.url("crypto/signing/verify"), params, false);
   }
 
   private void checkAssignmentDefaults() {
