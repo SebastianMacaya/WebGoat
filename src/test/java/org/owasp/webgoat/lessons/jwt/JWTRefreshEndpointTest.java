@@ -55,14 +55,13 @@ public class JWTRefreshEndpointTest extends LessonTest {
         "eyJhbGciOiJIUzUxMiJ9.eyJpYXQiOjE1MjYxMzE0MTEsImV4cCI6MTUyNjIxNzgxMSwiYWRtaW4iOiJmYWxzZSIsInVzZXIiOiJUb20ifQ.DCoaq9zQkyDH25EcVWKcdbyVfUL4c9D4jRvsqOqvi9iAd4QuqmKcchfbU8FNzeBNF9tLeFXHZLU4yRkq-bjm7Q";
     Map<String, Object> refreshJson = new HashMap<>();
     refreshJson.put("refresh_token", refreshToken);
-    result =
-        mockMvc
-            .perform(
-                MockMvcRequestBuilders.post("/JWT/refresh/newToken")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .header("Authorization", "Bearer " + accessTokenTom)
-                    .content(objectMapper.writeValueAsString(refreshJson)))
-            .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(
+            MockMvcRequestBuilders.post("/JWT/refresh/newToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .header("Authorization", "Bearer " + accessTokenTom)
+                .content(objectMapper.writeValueAsString(refreshJson)))
+        .andExpect(status().isUnauthorized());
   }
 
   @Test
