@@ -9,9 +9,12 @@ import static java.sql.ResultSet.TYPE_SCROLL_INSENSITIVE;
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.failed;
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.success;
 
+import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.owasp.webgoat.container.LessonDataSource;
 import org.owasp.webgoat.container.assignments.AssignmentEndpoint;
 import org.owasp.webgoat.container.assignments.AssignmentHints;
@@ -31,6 +34,15 @@ import org.springframework.web.bind.annotation.RestController;
     })
 public class SqlInjectionLesson2 implements AssignmentEndpoint {
 
+  private static final Pattern BY_USER_ID =
+      Pattern.compile(
+          "\\A\\s*SELECT\\s+department\\s+FROM\\s+employees\\s+WHERE\\s+userid\\s*=\\s*([0-9]{1,6})\\s*;?\\s*\\z",
+          Pattern.CASE_INSENSITIVE);
+  private static final Pattern BY_LAST_NAME =
+      Pattern.compile(
+          "\\A\\s*SELECT\\s+department\\s+FROM\\s+employees\\s+WHERE\\s+last_name\\s*=\\s*'([A-Za-z -]{1,20})'\\s*;?\\s*\\z",
+          Pattern.CASE_INSENSITIVE);
+
   private final LessonDataSource dataSource;
 
   public SqlInjectionLesson2(LessonDataSource dataSource) {
@@ -44,22 +56,36 @@ public class SqlInjectionLesson2 implements AssignmentEndpoint {
   }
 
   protected AttackResult injectableQuery(String query) {
-    try (var connection = dataSource.getConnection()) {
-      Statement statement = connection.createStatement(TYPE_SCROLL_INSENSITIVE, CONCUR_READ_ONLY);
-      ResultSet results = statement.executeQuery(query);
-      StringBuilder output = new StringBuilder();
+    if (query == null) {
+      return failed(this).feedback("sql-injection.2.failed").build();
+    }
+    Matcher byUserId = BY_USER_ID.matcher(query);
+    Matcher byLastName = BY_LAST_NAME.matcher(query);
+    boolean searchByUserId = byUserId.matches();
+    if (!searchByUserId && !byLastName.matches()) {
+      return failed(this).feedback("sql-injection.2.failed").build();
+    }
 
-      results.first();
-
-      if (results.getString("department").equals("Marketing")) {
-        output.append("<span class='feedback-positive'>" + query + "</span>");
-        output.append(SqlInjectionLesson8.generateTable(results));
-        return success(this).feedback("sql-injection.2.success").output(output.toString()).build();
-      } else {
-        return failed(this).feedback("sql-injection.2.failed").output(output.toString()).build();
+    String sql =
+        searchByUserId
+            ? "SELECT department FROM employees WHERE userid = ?"
+            : "SELECT department FROM employees WHERE last_name = ?";
+    String value = searchByUserId ? byUserId.group(1) : byLastName.group(1);
+    try (Connection connection = dataSource.getConnection();
+        PreparedStatement statement =
+            connection.prepareStatement(sql, TYPE_SCROLL_INSENSITIVE, CONCUR_READ_ONLY)) {
+      statement.setString(1, value);
+      try (ResultSet results = statement.executeQuery()) {
+        if (results.first() && "Marketing".equals(results.getString("department"))) {
+          return success(this)
+              .feedback("sql-injection.2.success")
+              .output(SqlInjectionLesson8.generateTable(results))
+              .build();
+        }
+        return failed(this).feedback("sql-injection.2.failed").build();
       }
-    } catch (SQLException sqle) {
-      return failed(this).feedback("sql-injection.2.failed").output(sqle.getMessage()).build();
+    } catch (SQLException e) {
+      return failed(this).feedback("sql-injection.2.failed").build();
     }
   }
 }

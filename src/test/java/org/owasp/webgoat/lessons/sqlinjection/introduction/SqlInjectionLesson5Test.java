@@ -4,12 +4,15 @@
  */
 package org.owasp.webgoat.lessons.sqlinjection.introduction;
 
+import static org.hamcrest.Matchers.is;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
-import org.hamcrest.CoreMatchers;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.owasp.webgoat.container.LessonDataSource;
 import org.owasp.webgoat.container.plugins.LessonTest;
@@ -20,22 +23,17 @@ public class SqlInjectionLesson5Test extends LessonTest {
 
   @Autowired private LessonDataSource dataSource;
 
-  @AfterEach
-  public void removeGrant() throws SQLException {
-    dataSource
-        .getConnection()
-        .prepareStatement("revoke select on grant_rights from unauthorized_user cascade")
-        .execute();
-  }
-
   @Test
-  public void grantSolution() throws Exception {
+  public void grantAttemptIsRejectedAndPrivilegesRemainUnchanged() throws Exception {
+    int grantsBefore = unauthorizedGrants();
     mockMvc
         .perform(
             MockMvcRequestBuilders.post("/SqlInjection/attack5")
                 .param("query", "grant select on grant_rights to unauthorized_user"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.lessonCompleted", CoreMatchers.is(true)));
+        .andExpect(jsonPath("$.lessonCompleted", is(false)));
+
+    assertEquals(grantsBefore, unauthorizedGrants());
   }
 
   @Test
@@ -45,7 +43,7 @@ public class SqlInjectionLesson5Test extends LessonTest {
             MockMvcRequestBuilders.post("/SqlInjection/attack5")
                 .param("query", "grant select on users to unauthorized_user"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.lessonCompleted", CoreMatchers.is(false)));
+        .andExpect(jsonPath("$.lessonCompleted", is(false)));
   }
 
   @Test
@@ -55,6 +53,29 @@ public class SqlInjectionLesson5Test extends LessonTest {
             MockMvcRequestBuilders.post("/SqlInjection/attack5")
                 .param("query", "select * from grant_rights"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.lessonCompleted", CoreMatchers.is(false)));
+        .andExpect(jsonPath("$.lessonCompleted", is(false)));
+  }
+
+  @Test
+  public void emptyQueryIsRejected() throws Exception {
+    mockMvc
+        .perform(MockMvcRequestBuilders.post("/SqlInjection/attack5"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.lessonCompleted", is(false)));
+  }
+
+  private int unauthorizedGrants() throws SQLException {
+    try (Connection connection = dataSource.getConnection();
+        PreparedStatement statement =
+            connection.prepareStatement(
+                "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLE_PRIVILEGES "
+                    + "WHERE TABLE_NAME = ? AND GRANTEE = ?")) {
+      statement.setString(1, "GRANT_RIGHTS");
+      statement.setString(2, "UNAUTHORIZED_USER");
+      try (ResultSet results = statement.executeQuery()) {
+        results.next();
+        return results.getInt(1);
+      }
+    }
   }
 }

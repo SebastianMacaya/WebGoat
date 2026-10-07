@@ -4,8 +4,6 @@
  */
 package org.owasp.webgoat.lessons.sqlinjection.introduction;
 
-import static java.sql.ResultSet.CONCUR_READ_ONLY;
-import static java.sql.ResultSet.TYPE_SCROLL_INSENSITIVE;
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.failed;
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.success;
 
@@ -13,6 +11,8 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.sql.Types;
+import java.util.regex.Pattern;
 import org.owasp.webgoat.container.LessonDataSource;
 import org.owasp.webgoat.container.assignments.AssignmentEndpoint;
 import org.owasp.webgoat.container.assignments.AssignmentHints;
@@ -27,6 +27,11 @@ import org.springframework.web.bind.annotation.RestController;
     value = {"SqlStringInjectionHint4-1", "SqlStringInjectionHint4-2", "SqlStringInjectionHint4-3"})
 public class SqlInjectionLesson4 implements AssignmentEndpoint {
 
+  private static final Pattern APPROVED_ALTER =
+      Pattern.compile(
+          "\\A\\s*ALTER\\s+TABLE\\s+employees\\s+ADD\\s+(?:COLUMN\\s+)?phone\\s+VARCHAR\\s*\\(\\s*20\\s*\\)\\s*;?\\s*\\z",
+          Pattern.CASE_INSENSITIVE);
+
   private final LessonDataSource dataSource;
 
   public SqlInjectionLesson4(LessonDataSource dataSource) {
@@ -40,25 +45,32 @@ public class SqlInjectionLesson4 implements AssignmentEndpoint {
   }
 
   protected AttackResult injectableQuery(String query) {
+    if (query == null || !APPROVED_ALTER.matcher(query).matches()) {
+      return failed(this).build();
+    }
+
     try (Connection connection = dataSource.getConnection()) {
-      try (Statement statement =
-          connection.createStatement(TYPE_SCROLL_INSENSITIVE, CONCUR_READ_ONLY)) {
-        statement.executeUpdate(query);
-        connection.commit();
-        ResultSet results = statement.executeQuery("SELECT phone from employees;");
-        StringBuilder output = new StringBuilder();
-        // user completes lesson if column phone exists
-        if (results.first()) {
-          output.append("<span class='feedback-positive'>" + query + "</span>");
-          return success(this).output(output.toString()).build();
-        } else {
-          return failed(this).output(output.toString()).build();
+      if (!phoneColumnExists(connection)) {
+        try (Statement statement = connection.createStatement()) {
+          statement.executeUpdate("ALTER TABLE employees ADD COLUMN phone VARCHAR(20)");
         }
-      } catch (SQLException sqle) {
-        return failed(this).output(sqle.getMessage()).build();
       }
-    } catch (Exception e) {
-      return failed(this).output(this.getClass().getName() + " : " + e.getMessage()).build();
+      return phoneColumnExists(connection)
+          ? success(this).output("<span class='feedback-positive'>phone</span>").build()
+          : failed(this).build();
+    } catch (SQLException e) {
+      return failed(this).build();
+    }
+  }
+
+  private boolean phoneColumnExists(Connection connection) throws SQLException {
+    try (ResultSet columns =
+        connection
+            .getMetaData()
+            .getColumns(null, connection.getSchema(), "EMPLOYEES", "PHONE")) {
+      return columns.next()
+          && columns.getInt("DATA_TYPE") == Types.VARCHAR
+          && columns.getInt("COLUMN_SIZE") == 20;
     }
   }
 }
