@@ -31,7 +31,7 @@ public class JWTHeaderKIDEndpointTest extends LessonTest {
   }
 
   @Test
-  public void solveAssignment() throws Exception {
+  public void injectedKeyIdCannotSelectAttackerKey() throws Exception {
     String key = "deletingTom";
     Map<String, Object> claims = new HashMap<>();
     claims.put("username", "Tom");
@@ -46,7 +46,7 @@ public class JWTHeaderKIDEndpointTest extends LessonTest {
     mockMvc
         .perform(MockMvcRequestBuilders.post("/JWT/kid/delete").param("token", token).content(""))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.lessonCompleted", is(true)));
+        .andExpect(jsonPath("$.lessonCompleted", is(false)));
   }
 
   @Test
@@ -57,7 +57,7 @@ public class JWTHeaderKIDEndpointTest extends LessonTest {
         .andExpect(status().isOk())
         .andExpect(
             jsonPath(
-                "$.feedback", CoreMatchers.is(messages.getMessage("jwt-final-jerry-account"))));
+                "$.feedback", CoreMatchers.is(messages.getMessage("jwt-invalid-token"))));
   }
 
   @Test

@@ -36,6 +36,8 @@ import org.springframework.web.bind.annotation.RestController;
   "jwt-jku-hint5"
 })
 public class JWTHeaderJKUEndpoint implements AssignmentEndpoint {
+  private static final String TRUSTED_JKU =
+      "https://cognito-idp.us-east-1.amazonaws.com/webgoat/.well-known/jwks.json";
 
   @PostMapping("jku/follow/{user}")
   public @ResponseBody String follow(@PathVariable("user") String user) {
@@ -54,7 +56,10 @@ public class JWTHeaderJKUEndpoint implements AssignmentEndpoint {
       try {
         var decodedJWT = JWT.decode(token);
         var jku = decodedJWT.getHeaderClaim("jku");
-        var jwkProvider = new JwkProviderBuilder(new URL(jku.asString())).build();
+        if (jku == null || !TRUSTED_JKU.equals(jku.asString()) || decodedJWT.getKeyId() == null) {
+          return failed(this).feedback("jwt-invalid-token").build();
+        }
+        var jwkProvider = new JwkProviderBuilder(new URL(TRUSTED_JKU)).build();
         var jwk = jwkProvider.get(decodedJWT.getKeyId());
         var algorithm = Algorithm.RSA256((RSAPublicKey) jwk.getPublicKey());
         JWT.require(algorithm).build().verify(decodedJWT);

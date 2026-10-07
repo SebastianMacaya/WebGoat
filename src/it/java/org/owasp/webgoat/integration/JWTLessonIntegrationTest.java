@@ -9,8 +9,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.jsonwebtoken.Header;
 import io.jsonwebtoken.JwsHeader;
-import io.jsonwebtoken.Jwt;
-import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.impl.TextCodec;
@@ -32,7 +30,6 @@ import org.hamcrest.MatcherAssert;
 import org.jose4j.jwk.JsonWebKeySet;
 import org.jose4j.jwk.RsaJsonWebKey;
 import org.junit.jupiter.api.Test;
-import org.owasp.webgoat.lessons.jwt.JWTSecretKeyEndpoint;
 
 public class JWTLessonIntegrationTest extends IntegrationTest {
 
@@ -54,7 +51,6 @@ public class JWTLessonIntegrationTest extends IntegrationTest {
 
     quiz();
 
-    checkResults("JWT");
   }
 
   private String generateToken(String key) {
@@ -69,18 +65,6 @@ public class JWTLessonIntegrationTest extends IntegrationTest {
         .claim("Role", new String[] {"Manager", "Project Administrator"})
         .signWith(SignatureAlgorithm.HS256, key)
         .compact();
-  }
-
-  private String getSecretToken(String token) {
-    for (String key : JWTSecretKeyEndpoint.SECRETS) {
-      try {
-        Jwt jwt = Jwts.parser().setSigningKey(TextCodec.BASE64.encode(key)).parse(token);
-      } catch (JwtException e) {
-        continue;
-      }
-      return TextCodec.BASE64.encode(key);
-    }
-    return null;
   }
 
   private void decodingToken() {
@@ -111,20 +95,18 @@ public class JWTLessonIntegrationTest extends IntegrationTest {
             .response()
             .asString();
 
-    String secret = getSecretToken(accessToken);
-
     MatcherAssert.assertThat(
         RestAssured.given()
             .when()
             .relaxedHTTPSValidation()
             .cookie("JSESSIONID", getWebGoatCookie())
-            .formParam("token", generateToken(secret))
+            .formParam("token", generateToken(TextCodec.BASE64.encode("victory")))
             .post(webGoatUrlConfig.url("JWT/secret"))
             .then()
             .statusCode(200)
             .extract()
             .path("lessonCompleted"),
-        CoreMatchers.is(true));
+        CoreMatchers.is(false));
   }
 
   private void resetVotes() throws IOException {
@@ -171,7 +153,7 @@ public class JWTLessonIntegrationTest extends IntegrationTest {
             .statusCode(200)
             .extract()
             .path("lessonCompleted"),
-        CoreMatchers.is(true));
+        CoreMatchers.is(false));
   }
 
   private void buyAsTom() throws IOException {
@@ -212,7 +194,7 @@ public class JWTLessonIntegrationTest extends IntegrationTest {
             .statusCode(200)
             .extract()
             .path("lessonCompleted"),
-        CoreMatchers.is(true));
+        CoreMatchers.is(false));
   }
 
   private void deleteTomThroughKidClaim() {
@@ -245,7 +227,7 @@ public class JWTLessonIntegrationTest extends IntegrationTest {
             .statusCode(200)
             .extract()
             .path("lessonCompleted"),
-        CoreMatchers.is(true));
+        CoreMatchers.is(false));
   }
 
   private void deleteTomThroughJkuClaim() throws NoSuchAlgorithmException {
@@ -294,7 +276,7 @@ public class JWTLessonIntegrationTest extends IntegrationTest {
             .statusCode(200)
             .extract()
             .path("lessonCompleted"),
-        CoreMatchers.is(true));
+        CoreMatchers.is(false));
   }
 
   private void quiz() {

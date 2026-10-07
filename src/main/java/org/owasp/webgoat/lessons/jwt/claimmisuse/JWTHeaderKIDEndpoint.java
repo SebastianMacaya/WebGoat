@@ -9,15 +9,11 @@ import static org.owasp.webgoat.container.assignments.AttackResultBuilder.succes
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwsHeader;
-import io.jsonwebtoken.Jwt;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SigningKeyResolverAdapter;
-import io.jsonwebtoken.impl.TextCodec;
-import java.sql.ResultSet;
-import java.sql.SQLException;
+import java.security.SecureRandom;
 import org.apache.commons.lang3.StringUtils;
-import org.owasp.webgoat.container.LessonDataSource;
 import org.owasp.webgoat.container.assignments.AssignmentEndpoint;
 import org.owasp.webgoat.container.assignments.AssignmentHints;
 import org.owasp.webgoat.container.assignments.AttackResult;
@@ -39,10 +35,10 @@ import org.springframework.web.bind.annotation.RestController;
 })
 @RequestMapping("/JWT/")
 public class JWTHeaderKIDEndpoint implements AssignmentEndpoint {
-  private final LessonDataSource dataSource;
+  private static final byte[] SIGNING_KEY = new byte[64];
 
-  private JWTHeaderKIDEndpoint(LessonDataSource dataSource) {
-    this.dataSource = dataSource;
+  static {
+    new SecureRandom().nextBytes(SIGNING_KEY);
   }
 
   @PostMapping("kid/follow/{user}")
@@ -60,34 +56,17 @@ public class JWTHeaderKIDEndpoint implements AssignmentEndpoint {
       return failed(this).feedback("jwt-invalid-token").build();
     } else {
       try {
-        final String[] errorMessage = {null};
-        Jwt jwt =
+        Claims claims =
             Jwts.parser()
                 .setSigningKeyResolver(
                     new SigningKeyResolverAdapter() {
                       @Override
                       public byte[] resolveSigningKeyBytes(JwsHeader header, Claims claims) {
-                        final String kid = (String) header.get("kid");
-                        try (var connection = dataSource.getConnection()) {
-                          ResultSet rs =
-                              connection
-                                  .createStatement()
-                                  .executeQuery(
-                                      "SELECT key FROM jwt_keys WHERE id = '" + kid + "'");
-                          while (rs.next()) {
-                            return TextCodec.BASE64.decode(rs.getString(1));
-                          }
-                        } catch (SQLException e) {
-                          errorMessage[0] = e.getMessage();
-                        }
-                        return null;
+                        return "webgoat_key".equals(header.getKeyId()) ? SIGNING_KEY : null;
                       }
                     })
-                .parseClaimsJws(token);
-        if (errorMessage[0] != null) {
-          return failed(this).output(errorMessage[0]).build();
-        }
-        Claims claims = (Claims) jwt.getBody();
+                .parseClaimsJws(token)
+                .getBody();
         String username = (String) claims.get("username");
         if ("Jerry".equals(username)) {
           return failed(this).feedback("jwt-final-jerry-account").build();

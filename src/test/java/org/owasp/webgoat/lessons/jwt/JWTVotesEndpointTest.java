@@ -7,7 +7,6 @@ package org.owasp.webgoat.lessons.jwt;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.is;
-import static org.owasp.webgoat.lessons.jwt.JWTVotesEndpoint.JWT_PASSWORD;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -15,6 +14,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.impl.TextCodec;
 import jakarta.servlet.http.Cookie;
 import java.util.Map;
 import org.hamcrest.CoreMatchers;
@@ -50,7 +50,7 @@ public class JWTVotesEndpointTest extends LessonTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .cookie(new Cookie("access_token", token)))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.lessonCompleted", is(true)));
+        .andExpect(jsonPath("$.lessonCompleted", is(false)));
   }
 
   @Test
@@ -68,7 +68,7 @@ public class JWTVotesEndpointTest extends LessonTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .cookie(new Cookie("access_token", token)))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.lessonCompleted", is(true)));
+        .andExpect(jsonPath("$.lessonCompleted", is(false)));
   }
 
   @Test
@@ -207,7 +207,7 @@ public class JWTVotesEndpointTest extends LessonTest {
     claims.put("user", "Intruder");
     String token =
         Jwts.builder()
-            .signWith(io.jsonwebtoken.SignatureAlgorithm.HS512, JWT_PASSWORD)
+            .signWith(io.jsonwebtoken.SignatureAlgorithm.HS512, TextCodec.BASE64.encode("victory"))
             .setClaims(claims)
             .compact();
 
@@ -225,7 +225,7 @@ public class JWTVotesEndpointTest extends LessonTest {
     claims.put("user", "Intruder");
     String token =
         Jwts.builder()
-            .signWith(io.jsonwebtoken.SignatureAlgorithm.HS512, JWT_PASSWORD)
+            .signWith(io.jsonwebtoken.SignatureAlgorithm.HS512, TextCodec.BASE64.encode("victory"))
             .setClaims(claims)
             .compact();
 
