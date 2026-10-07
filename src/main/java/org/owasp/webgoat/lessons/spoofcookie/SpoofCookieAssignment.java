@@ -6,7 +6,6 @@ package org.owasp.webgoat.lessons.spoofcookie;
 
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.failed;
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.informationMessage;
-import static org.owasp.webgoat.container.assignments.AttackResultBuilder.success;
 
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletResponse;
@@ -114,9 +113,6 @@ public class SpoofCookieAssignment implements AssignmentEndpoint {
   private AttackResult cookieLoginFlow(String cookieValue) {
     AuthenticatedCookie authenticatedCookie = authenticatedCookies.get(cookieValue);
     if (authenticatedCookie != null && Instant.now().isBefore(authenticatedCookie.expiresAt())) {
-      if (authenticatedCookie.username().equals(ATTACK_USERNAME)) {
-        return success(this).build();
-      }
       return failed(this)
           .feedback("spoofcookie.cookie-login")
           .output("Authenticated as " + authenticatedCookie.username())
