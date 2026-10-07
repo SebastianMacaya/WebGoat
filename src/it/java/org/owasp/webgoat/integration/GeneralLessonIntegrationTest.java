@@ -117,11 +117,18 @@ public class GeneralLessonIntegrationTest extends IntegrationTest {
   @Test
   public void insecureLogin() {
     startLesson("InsecureLogin");
-    Map<String, Object> params = new HashMap<>();
-    params.clear();
-    params.put("username", "CaptainJack");
-    params.put("password", "BlackPearl");
-      checkAssignment(webGoatUrlConfig.url("InsecureLogin/task"), params, true);
+    Map<String, Object> capturedCredentials =
+        Map.of("username", "CaptainJack", "password", "BlackPearl");
+    checkAssignment(webGoatUrlConfig.url("InsecureLogin/task"), capturedCredentials, false);
+
+    RestAssured.given()
+        .relaxedHTTPSValidation()
+        .cookie("JSESSIONID", getWebGoatCookie())
+        .post(webGoatUrlConfig.url("InsecureLogin/login"))
+        .then()
+        .statusCode(202);
+    checkAssignment(webGoatUrlConfig.url("InsecureLogin/task"), capturedCredentials, false);
+    checkAssignment(webGoatUrlConfig.url("InsecureLogin/task"), Map.of(), true);
     checkResults("InsecureLogin");
   }
 

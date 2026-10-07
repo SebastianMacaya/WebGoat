@@ -1,7 +1,8 @@
 
 === Concept
 Encryption is an essential tool for secure communication. In this lesson, we will find out why it should always be employed when sending sensitive data.
+Credentials should also be verified on the server and never embedded in browser scripts.
 
 === Goals
 * The user should have a basic understanding of packet sniffer usage
-* The user will be able to intercept and read unencrypted requests
+* The user will be able to inspect requests and verify that credentials are not transmitted by this demo

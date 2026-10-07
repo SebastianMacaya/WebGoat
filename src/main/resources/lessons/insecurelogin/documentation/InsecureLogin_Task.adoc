@@ -1,4 +1,3 @@
 === Let's try
-Click the "log in" button to send a request containing the login credentials of another user.
-Then, write these credentials into the appropriate fields and submit them to confirm.
-Try using a packet sniffer to intercept the request.
+Click "Log in" and inspect the request. It should contain no username or password.
+Then click "Confirm login" to verify the server-side session.
