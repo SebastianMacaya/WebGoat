@@ -5,9 +5,12 @@
 package org.owasp.webgoat.lessons.hijacksession.cas;
 
 import java.security.SecureRandom;
+import java.time.Instant;
+import java.util.HexFormat;
 import java.util.LinkedList;
 import java.util.Queue;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
@@ -23,13 +26,20 @@ public class HijackSessionAuthenticationProvider implements AuthenticationProvid
 
   private final Queue<String> sessions = new LinkedList<>();
   private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+  private static final AtomicLong ID_COUNTER =
+      new AtomicLong(SECURE_RANDOM.nextLong() & (Long.MAX_VALUE >>> 1));
   protected static final int MAX_SESSIONS = 50;
 
   private static final Supplier<String> GENERATE_SESSION_ID =
-      () ->
-          Long.toString(SECURE_RANDOM.nextLong() & Long.MAX_VALUE)
-              + "-"
-              + Long.toString(SECURE_RANDOM.nextLong() & Long.MAX_VALUE);
+      () -> {
+        byte[] randomBytes = new byte[16];
+        SECURE_RANDOM.nextBytes(randomBytes);
+        return ID_COUNTER.incrementAndGet()
+            + "-"
+            + Instant.now().toEpochMilli()
+            + "-"
+            + HexFormat.of().formatHex(randomBytes);
+      };
   public static final Supplier<Authentication> AUTHENTICATION_SUPPLIER =
       () -> Authentication.builder().id(GENERATE_SESSION_ID.get()).build();
 

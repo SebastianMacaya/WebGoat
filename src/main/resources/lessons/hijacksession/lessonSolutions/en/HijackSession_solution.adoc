@@ -2,6 +2,8 @@
 
 == Solution
 
+The following steps describe the original two-part cookie. The patched cookie adds an independent 128-bit random suffix, so predicting the number and time no longer authenticates a session.
+
 Some standard Linux tools have been used on this solution.
 
 === Analysis
