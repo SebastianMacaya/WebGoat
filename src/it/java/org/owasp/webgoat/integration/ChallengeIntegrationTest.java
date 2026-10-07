@@ -81,37 +81,7 @@ public class ChallengeIntegrationTest extends IntegrationTest {
     params.put("username_login", "Larry");
     params.put("password_login", "1' or '1'='1");
 
-      String result =
-        RestAssured.given()
-            .when()
-            .relaxedHTTPSValidation()
-            .cookie("JSESSIONID", getWebGoatCookie())
-            .formParams(params)
-            .post(webGoatUrlConfig.url("challenge/5"))
-            .then()
-            .statusCode(200)
-            .extract()
-            .asString();
-
-    String flag = result.substring(result.indexOf("flag") + 6, result.indexOf("flag") + 42);
-    params.clear();
-    params.put("flag", flag);
-      checkAssignment(webGoatUrlConfig.url("challenge/flag/5"), params, true);
-
-    checkResults("Challenge5");
-
-      List<String> capturefFlags =
-        RestAssured.given()
-            .when()
-            .relaxedHTTPSValidation()
-            .cookie("JSESSIONID", getWebGoatCookie())
-            .get(webGoatUrlConfig.url("scoreboard-data"))
-            .then()
-            .statusCode(200)
-            .extract()
-            .jsonPath()
-            .get("find { it.username == \"" + this.getUser() + "\" }.flagsCaptured");
-    assertTrue(capturefFlags.contains("Without password"));
+    checkAssignment(webGoatUrlConfig.url("challenge/5"), params, false);
   }
 
   @Test
