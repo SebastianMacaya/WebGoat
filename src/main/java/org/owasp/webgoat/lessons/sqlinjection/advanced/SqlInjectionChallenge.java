@@ -51,22 +51,24 @@ public class SqlInjectionChallenge implements AssignmentEndpoint {
     if (attackResult == null) {
 
       try (Connection connection = dataSource.getConnection()) {
-        String checkUserQuery =
-            "select userid from sql_challenge_users where userid = '" + username + "'";
-        Statement statement = connection.createStatement();
-        ResultSet resultSet = statement.executeQuery(checkUserQuery);
-
-        if (resultSet.next()) {
-          attackResult = failed(this).feedback("user.exists").feedbackArgs(username).build();
-        } else {
-          PreparedStatement preparedStatement =
-              connection.prepareStatement("INSERT INTO sql_challenge_users VALUES (?, ?, ?)");
-          preparedStatement.setString(1, username);
-          preparedStatement.setString(2, email);
-          preparedStatement.setString(3, password);
-          preparedStatement.execute();
-          attackResult =
-              informationMessage(this).feedback("user.created").feedbackArgs(username).build();
+        try (PreparedStatement checkUser =
+                connection.prepareStatement("select userid from sql_challenge_users where userid = ?")) {
+          checkUser.setString(1, username);
+          try (ResultSet resultSet = checkUser.executeQuery()) {
+            if (resultSet.next()) {
+              attackResult = failed(this).feedback("user.exists").feedbackArgs(username).build();
+            } else {
+              try (PreparedStatement insertUser =
+                  connection.prepareStatement("INSERT INTO sql_challenge_users VALUES (?, ?, ?)")) {
+                insertUser.setString(1, username);
+                insertUser.setString(2, email);
+                insertUser.setString(3, password);
+                insertUser.execute();
+              }
+              attackResult =
+                  informationMessage(this).feedback("user.created").feedbackArgs(username).build();
+            }
+          }
         }
       } catch (SQLException e) {
         attackResult = failed(this).output("Something went wrong").build();
