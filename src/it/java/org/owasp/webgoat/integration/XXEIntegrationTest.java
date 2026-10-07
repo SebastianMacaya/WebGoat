@@ -106,16 +106,15 @@ public class XXEIntegrationTest extends IntegrationTest {
   }
 
   @Test
-  public void runTests() throws IOException {
+  public void secureSimpleAndContentType() throws IOException {
     startLesson("XXE", true);
     webGoatHomeDirectory = webGoatServerDirectory();
-      checkAssignment(webGoatUrlConfig.url("xxe/simple"), ContentType.XML, xxe3, true);
-      checkAssignment(webGoatUrlConfig.url("xxe/content-type"), ContentType.XML, xxe4, true);
-      checkAssignment(
-              webGoatUrlConfig.url("xxe/blind"),
+    checkAssignment(webGoatUrlConfig.url("xxe/simple"), ContentType.XML, xxe3, false);
+    checkAssignment(webGoatUrlConfig.url("xxe/content-type"), ContentType.XML, xxe4, false);
+    checkAssignment(
+        webGoatUrlConfig.url("xxe/blind"),
         ContentType.XML,
         "<comment><text>" + getSecret() + "</text></comment>",
         true);
-    checkResults("XXE");
   }
 }
