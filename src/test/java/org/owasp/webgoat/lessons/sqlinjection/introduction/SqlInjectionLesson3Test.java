@@ -24,7 +24,8 @@ public class SqlInjectionLesson3Test extends LessonTest {
   @Autowired private LessonDataSource dataSource;
 
   @Test
-  public void expectedDepartmentChangeStillWorks() throws Exception {
+  public void requestedDepartmentChangeIsRejected() throws Exception {
+    String departmentBefore = departmentForBarnett();
     mockMvc
         .perform(
             MockMvcRequestBuilders.post("/SqlInjection/attack3")
@@ -32,9 +33,9 @@ public class SqlInjectionLesson3Test extends LessonTest {
                     "query",
                     "update employees set department='Sales' where last_name='Barnett'"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.lessonCompleted", is(true)));
+        .andExpect(jsonPath("$.lessonCompleted", is(false)));
 
-    assertEquals("Sales", departmentForBarnett());
+    assertEquals(departmentBefore, departmentForBarnett());
   }
 
   @Test

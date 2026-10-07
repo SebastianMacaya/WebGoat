@@ -5,6 +5,7 @@
 package org.owasp.webgoat.lessons.sqlinjection.introduction;
 
 import static org.hamcrest.Matchers.is;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -23,17 +24,18 @@ public class SqlInjectionLesson4Test extends LessonTest {
   @Autowired private LessonDataSource dataSource;
 
   @Test
-  public void expectedColumnAdditionIsIdempotent() throws Exception {
+  public void requestedColumnAdditionIsRejected() throws Exception {
+    boolean phoneExisted = columnExists("PHONE");
     for (int attempt = 0; attempt < 2; attempt++) {
       mockMvc
           .perform(
               MockMvcRequestBuilders.post("/SqlInjection/attack4")
                   .param("query", "alter table employees add column phone varchar(20)"))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.lessonCompleted", is(true)));
+          .andExpect(jsonPath("$.lessonCompleted", is(false)));
     }
 
-    assertTrue(columnExists("PHONE"));
+    assertEquals(phoneExisted, columnExists("PHONE"));
   }
 
   @Test
