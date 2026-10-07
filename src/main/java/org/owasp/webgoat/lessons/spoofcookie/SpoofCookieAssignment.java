@@ -40,21 +40,17 @@ import org.springframework.web.bind.annotation.RestController;
 public class SpoofCookieAssignment implements AssignmentEndpoint {
 
   private static final String COOKIE_NAME = "spoof_auth";
+  private static final String COOKIE_INFO =
+      "Cookie details for user %s:<br />" + COOKIE_NAME + "=%s";
   private static final Duration COOKIE_LIFETIME = Duration.ofMinutes(30);
   private static final String ATTACK_USERNAME = "tom";
 
   private static final Map<String, String> users =
-      Map.of("webgoat", "webgoat", "admin", "admin", ATTACK_USERNAME, randomPassword());
+      Map.of("webgoat", "webgoat", "admin", "admin", ATTACK_USERNAME, "apasswordfortom");
   private final SecureRandom random = new SecureRandom();
   private final Map<String, AuthenticatedCookie> authenticatedCookies = new ConcurrentHashMap<>();
 
   private record AuthenticatedCookie(String username, Instant expiresAt) {}
-
-  private static String randomPassword() {
-    byte[] bytes = new byte[32];
-    new SecureRandom().nextBytes(bytes);
-    return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
-  }
 
   @PostMapping(path = "/SpoofCookie/login")
   @ResponseBody
@@ -88,6 +84,10 @@ public class SpoofCookieAssignment implements AssignmentEndpoint {
   private AttackResult credentialsLoginFlow(
       String username, String password, HttpServletResponse response) {
     String lowerCasedUsername = username.toLowerCase();
+    if (ATTACK_USERNAME.equals(lowerCasedUsername)
+        && users.get(lowerCasedUsername).equals(password)) {
+      return informationMessage(this).feedback("spoofcookie.cheating").build();
+    }
     String authPassword = users.getOrDefault(lowerCasedUsername, "");
     if (!authPassword.isBlank() && authPassword.equals(password)) {
       Instant now = Instant.now();
@@ -105,7 +105,7 @@ public class SpoofCookieAssignment implements AssignmentEndpoint {
       response.addCookie(newCookie);
       return informationMessage(this)
           .feedback("spoofcookie.login")
-          .output("Authenticated as " + lowerCasedUsername)
+          .output(String.format(COOKIE_INFO, lowerCasedUsername, newCookie.getValue()))
           .build();
     }
 
@@ -120,7 +120,7 @@ public class SpoofCookieAssignment implements AssignmentEndpoint {
       }
       return failed(this)
           .feedback("spoofcookie.cookie-login")
-          .output("Authenticated as " + authenticatedCookie.username())
+          .output(String.format(COOKIE_INFO, authenticatedCookie.username(), cookieValue))
           .build();
     }
     authenticatedCookies.remove(cookieValue);
