@@ -10,8 +10,8 @@ import static org.owasp.webgoat.container.assignments.AttackResultBuilder.succes
 import jakarta.servlet.http.HttpServletRequest;
 import java.nio.charset.StandardCharsets;
 import java.security.InvalidAlgorithmParameterException;
-import java.security.KeyPair;
 import java.security.NoSuchAlgorithmException;
+import java.security.PublicKey;
 import java.security.interfaces.RSAPublicKey;
 import java.util.Base64;
 import javax.xml.bind.DatatypeConverter;
@@ -38,6 +38,8 @@ import org.springframework.web.server.ResponseStatusException;
 @Slf4j
 public class SigningAssignment implements AssignmentEndpoint {
 
+  private static final String PUBLIC_KEY_SESSION_ATTRIBUTE = "signingPublicKey";
+
   @GetMapping(path = "/crypto/signing/getprivate", produces = MediaType.TEXT_PLAIN_VALUE)
   @ResponseBody
   public String getPrivateKey() {
@@ -48,14 +50,15 @@ public class SigningAssignment implements AssignmentEndpoint {
   @ResponseBody
   public String getPublicKey(HttpServletRequest request)
       throws NoSuchAlgorithmException, InvalidAlgorithmParameterException {
-    KeyPair keyPair = (KeyPair) request.getSession().getAttribute("keyPair");
-    if (keyPair == null) {
-      keyPair = CryptoUtil.generateKeyPair();
-      request.getSession().setAttribute("keyPair", keyPair);
+    PublicKey publicKey =
+        (PublicKey) request.getSession().getAttribute(PUBLIC_KEY_SESSION_ATTRIBUTE);
+    if (publicKey == null) {
+      publicKey = CryptoUtil.generateKeyPair().getPublic();
+      request.getSession().setAttribute(PUBLIC_KEY_SESSION_ATTRIBUTE, publicKey);
     }
     return "-----BEGIN PUBLIC KEY-----\n"
         + Base64.getMimeEncoder(64, "\n".getBytes(StandardCharsets.US_ASCII))
-            .encodeToString(keyPair.getPublic().getEncoded())
+            .encodeToString(publicKey.getEncoded())
         + "\n-----END PUBLIC KEY-----\n";
   }
 
@@ -66,11 +69,12 @@ public class SigningAssignment implements AssignmentEndpoint {
 
     String tempModulus =
         modulus; /* used to validate the modulus of the public key but might need to be corrected */
-    KeyPair keyPair = (KeyPair) request.getSession().getAttribute("keyPair");
-    if (keyPair == null) {
+    PublicKey publicKey =
+        (PublicKey) request.getSession().getAttribute(PUBLIC_KEY_SESSION_ATTRIBUTE);
+    if (publicKey == null) {
       return failed(this).feedback("crypto-signing.notok").build();
     }
-    RSAPublicKey rsaPubKey = (RSAPublicKey) keyPair.getPublic();
+    RSAPublicKey rsaPubKey = (RSAPublicKey) publicKey;
     if (tempModulus.length() == 512) {
       tempModulus = "00".concat(tempModulus);
     }
@@ -80,7 +84,7 @@ public class SigningAssignment implements AssignmentEndpoint {
       return failed(this).feedback("crypto-signing.modulusnotok").build();
     }
     /* orginal modulus must be used otherwise the signature would be invalid */
-    if (CryptoUtil.verifyMessage(modulus, signature, keyPair.getPublic())) {
+    if (CryptoUtil.verifyMessage(modulus, signature, publicKey)) {
       return success(this).feedback("crypto-signing.success").build();
     } else {
       log.warn("signature incorrect");

@@ -6,11 +6,14 @@ package org.owasp.webgoat.lessons.cryptography;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.security.KeyPair;
+import java.security.PublicKey;
 import java.security.interfaces.RSAPublicKey;
 import javax.xml.bind.DatatypeConverter;
 import org.junit.jupiter.api.Test;
@@ -23,6 +26,8 @@ class SigningAssignmentTest extends LessonTest {
   @Test
   void privateKeyIsNotAvailableAndUnrelatedSignatureCannotVerify() throws Exception {
     MockHttpSession session = new MockHttpSession();
+    KeyPair trustedSigner = CryptoUtil.generateKeyPair();
+    session.setAttribute("signingPublicKey", trustedSigner.getPublic());
 
     mockMvc
         .perform(MockMvcRequestBuilders.get("/crypto/signing/getprivate").session(session))
@@ -33,10 +38,9 @@ class SigningAssignmentTest extends LessonTest {
         .andExpect(content().string(containsString("-----BEGIN PUBLIC KEY-----")))
         .andExpect(content().string(not(containsString("PRIVATE KEY"))));
 
-    KeyPair serverKeyPair = (KeyPair) session.getAttribute("keyPair");
     String modulus =
         DatatypeConverter.printHexBinary(
-            ((RSAPublicKey) serverKeyPair.getPublic()).getModulus().toByteArray());
+            ((RSAPublicKey) trustedSigner.getPublic()).getModulus().toByteArray());
     String forgedSignature =
         CryptoUtil.signMessage(modulus, CryptoUtil.generateKeyPair().getPrivate());
 
@@ -54,9 +58,22 @@ class SigningAssignmentTest extends LessonTest {
             MockMvcRequestBuilders.post("/crypto/signing/verify")
                 .session(session)
                 .param("modulus", modulus)
-                .param("signature", CryptoUtil.signMessage(modulus, serverKeyPair.getPrivate())))
+                .param("signature", CryptoUtil.signMessage(modulus, trustedSigner.getPrivate())))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.lessonCompleted").value(true));
+  }
+
+  @Test
+  void publicKeyEndpointDoesNotRetainPrivateMaterialInSession() throws Exception {
+    MockHttpSession session = new MockHttpSession();
+
+    mockMvc
+        .perform(MockMvcRequestBuilders.get("/crypto/signing/getpublic").session(session))
+        .andExpect(status().isOk());
+
+    assertInstanceOf(PublicKey.class, session.getAttribute("signingPublicKey"));
+    assertNull(session.getAttribute("keyPair"));
+    assertNull(session.getAttribute("privateKeyString"));
   }
 
   @Test
