@@ -128,7 +128,7 @@ class ResetLinkAssignmentTest extends LessonTest {
                 .param("email", TOM_EMAIL)
                 .header(HttpHeaders.HOST, "attacker.example:9090"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.lessonCompleted", CoreMatchers.is(true)));
+        .andExpect(jsonPath("$.lessonCompleted", CoreMatchers.is(false)));
 
     String token = ResetLinkAssignment.resetLinks.keySet().iterator().next();
     ArgumentCaptor<PasswordResetEmail> mail = ArgumentCaptor.forClass(PasswordResetEmail.class);
