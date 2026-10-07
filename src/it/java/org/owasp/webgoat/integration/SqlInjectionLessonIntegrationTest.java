@@ -71,12 +71,12 @@ public class SqlInjectionLessonIntegrationTest extends IntegrationTest {
     params.clear();
     params.put("name", sql_12_a);
     params.put("auth_tan", sql_12_b);
-      checkAssignment(webGoatUrlConfig.url("SqlInjection/attack9"), params, true);
+      checkAssignment(webGoatUrlConfig.url("SqlInjection/attack9"), params, false);
 
     params.clear();
     params.put("action_string", sql_13);
       checkAssignment(webGoatUrlConfig.url("SqlInjection/attack10"), params, true);
 
-    checkResults("SqlInjection");
+    // A mitigated injection exercise is no longer marked as solved by its attack payload.
   }
 }

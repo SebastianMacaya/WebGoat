@@ -6,11 +6,20 @@ package org.owasp.webgoat.lessons.sqlinjection.introduction;
 
 import static org.hamcrest.CoreMatchers.containsString;
 import static org.hamcrest.CoreMatchers.is;
+import static org.hamcrest.CoreMatchers.not;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import org.junit.jupiter.api.Test;
+import org.owasp.webgoat.container.LessonDataSource;
 import org.owasp.webgoat.container.plugins.LessonTest;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 
 /**
@@ -19,32 +28,33 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
  */
 public class SqlInjectionLesson9Test extends LessonTest {
 
-  private final String completedError = "JSON path \"lessonCompleted\"";
+  @Autowired private LessonDataSource dataSource;
 
   @Test
-  public void malformedQueryReturnsError() throws Exception {
-    try {
-      mockMvc
-          .perform(
-              MockMvcRequestBuilders.post("/SqlInjection/attack9")
-                  .param("name", "Smith")
-                  .param("auth_tan", "3SL99A' OR '1' = '1'"))
-          .andExpect(status().isOk())
-          .andExpect(jsonPath("lessonCompleted", is(false)))
-          .andExpect(jsonPath("$.output", containsString("feedback-negative")));
-    } catch (AssertionError e) {
-      if (!e.getMessage().contains(completedError)) throw e;
+  public void validCredentialsStillDisplayTheSalaryTable() throws Exception {
+    int originalSalary = getSmithSalary();
+    mockMvc
+        .perform(
+            MockMvcRequestBuilders.post("/SqlInjection/attack9")
+                .param("name", "Smith")
+                .param("auth_tan", "3SL99A"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.lessonCompleted", is(false)))
+        .andExpect(jsonPath("$.output", containsString(Integer.toString(originalSalary))));
+    assertEquals(originalSalary, getSmithSalary());
+  }
 
-      mockMvc
-          .perform(
-              MockMvcRequestBuilders.post("/SqlInjection/attack9")
-                  .param("name", "Smith")
-                  .param("auth_tan", "3SL99A' OR '1' = '1'"))
-          .andExpect(status().isOk())
-          .andExpect(jsonPath("lessonCompleted", is(true)))
-          .andExpect(jsonPath("$.feedback", is(messages.getMessage("sql-injection.9.success"))))
-          .andExpect(jsonPath("$.output", containsString("feedback-negative")));
-    }
+  @Test
+  public void quotedTanIsTreatedAsData() throws Exception {
+    mockMvc
+        .perform(
+            MockMvcRequestBuilders.post("/SqlInjection/attack9")
+                .param("name", "Smith")
+                .param("auth_tan", "3SL99A' OR '1' = '1'"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.lessonCompleted", is(false)))
+        .andExpect(jsonPath("$.feedback", is(messages.getMessage("sql-injection.9.one"))))
+        .andExpect(jsonPath("$.output", not(containsString("feedback-negative"))));
   }
 
   @Test
@@ -75,6 +85,7 @@ public class SqlInjectionLesson9Test extends LessonTest {
 
   @Test
   public void OnlySmithMustMostEarning() throws Exception {
+    int originalSalary = getSmithSalary();
     mockMvc
         .perform(
             MockMvcRequestBuilders.post("/SqlInjection/attack9")
@@ -83,10 +94,12 @@ public class SqlInjectionLesson9Test extends LessonTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("lessonCompleted", is(false)))
         .andExpect(jsonPath("$.feedback", is(messages.getMessage("sql-injection.9.one"))));
+    assertEquals(originalSalary, getSmithSalary());
   }
 
   @Test
-  public void SmithIsMostEarningCompletesAssignment() throws Exception {
+  public void chainedUpdateInTanCannotModifySalary() throws Exception {
+    int originalSalary = getSmithSalary();
     mockMvc
         .perform(
             MockMvcRequestBuilders.post("/SqlInjection/attack9")
@@ -95,8 +108,20 @@ public class SqlInjectionLesson9Test extends LessonTest {
                     "auth_tan",
                     "3SL99A'; UPDATE employees SET salary = '300000' WHERE last_name = 'Smith"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("lessonCompleted", is(true)))
-        .andExpect(jsonPath("$.feedback", is(messages.getMessage("sql-injection.9.success"))))
-        .andExpect(jsonPath("$.output", containsString("300000")));
+        .andExpect(jsonPath("lessonCompleted", is(false)))
+        .andExpect(jsonPath("$.feedback", is(messages.getMessage("sql-injection.9.one"))));
+    assertEquals(originalSalary, getSmithSalary());
+  }
+
+  private int getSmithSalary() throws SQLException {
+    try (Connection connection = dataSource.getConnection();
+        PreparedStatement statement =
+            connection.prepareStatement("SELECT salary FROM employees WHERE auth_tan = ?")) {
+      statement.setString(1, "3SL99A");
+      try (ResultSet result = statement.executeQuery()) {
+        assertTrue(result.next());
+        return result.getInt(1);
+      }
+    }
   }
 }
