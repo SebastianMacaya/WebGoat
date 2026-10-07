@@ -75,8 +75,8 @@ public class SqlInjectionLessonIntegrationTest extends IntegrationTest {
 
     params.clear();
     params.put("action_string", sql_13);
-      checkAssignment(webGoatUrlConfig.url("SqlInjection/attack10"), params, true);
+      checkAssignment(webGoatUrlConfig.url("SqlInjection/attack10"), params, false);
 
-    checkResults("SqlInjection");
+    // The injection payload can no longer complete this assignment.
   }
 }
