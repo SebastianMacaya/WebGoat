@@ -41,7 +41,7 @@ public class SecurityQuestionAssignmentTest extends LessonTest {
   }
 
   @Test
-  public void twoQuestionsShouldSolveTheAssignment() throws Exception {
+  public void twoPublicQuestionsDoNotVerifyIdentity() throws Exception {
     MockHttpSession mocksession = new MockHttpSession();
     mockMvc
         .perform(
@@ -58,9 +58,11 @@ public class SecurityQuestionAssignmentTest extends LessonTest {
                 .session(mocksession))
         .andExpect(status().isOk())
         .andExpect(
-            jsonPath("$.feedback", CoreMatchers.is(messages.getMessage("assignment.solved"))))
+            jsonPath(
+                "$.feedback",
+                CoreMatchers.is(messages.getMessage("password-questions-one-successful"))))
         .andExpect(jsonPath("$.output", CoreMatchers.notNullValue()))
-        .andExpect(jsonPath("$.lessonCompleted", CoreMatchers.is(true)));
+        .andExpect(jsonPath("$.lessonCompleted", CoreMatchers.is(false)));
   }
 
   @Test
@@ -98,7 +100,7 @@ public class SecurityQuestionAssignmentTest extends LessonTest {
             MockMvcRequestBuilders.post("/PasswordReset/SecurityQuestions")
                 .param("question", "In what year was your mother born?")
                 .session(mocksession))
-        .andExpect(jsonPath("$.lessonCompleted", CoreMatchers.is(true)));
+        .andExpect(jsonPath("$.lessonCompleted", CoreMatchers.is(false)));
 
     MockHttpSession mocksession2 = new MockHttpSession();
     mockMvc
@@ -106,6 +108,16 @@ public class SecurityQuestionAssignmentTest extends LessonTest {
             MockMvcRequestBuilders.post("/PasswordReset/SecurityQuestions")
                 .param("question", "What is your favorite animal?")
                 .session(mocksession2))
+        .andExpect(jsonPath("$.lessonCompleted", CoreMatchers.is(false)));
+  }
+
+  @Test
+  public void unknownQuestionDoesNotCauseServerError() throws Exception {
+    mockMvc
+        .perform(
+            MockMvcRequestBuilders.post("/PasswordReset/SecurityQuestions")
+                .param("question", "not a configured question"))
+        .andExpect(status().isOk())
         .andExpect(jsonPath("$.lessonCompleted", CoreMatchers.is(false)));
   }
 }

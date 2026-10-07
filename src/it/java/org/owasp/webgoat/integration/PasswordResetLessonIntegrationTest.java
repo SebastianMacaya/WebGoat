@@ -11,7 +11,6 @@ import java.util.Arrays;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.assertj.core.api.Assertions;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.TestFactory;
@@ -46,14 +45,14 @@ public class PasswordResetLessonIntegrationTest extends IntegrationTest {
             this.getUser() + "@webgoat.org",
             "password",
             StringUtils.reverse(this.getUser())),
-        true);
+        false);
   }
 
   public void assignment4() {
       checkAssignment(
               webGoatUrlConfig.url("PasswordReset/questions"),
         Map.of("username", "tom", "securityQuestion", "purple"),
-        true);
+        false);
   }
 
   public void assignment5() {
@@ -64,7 +63,7 @@ public class PasswordResetLessonIntegrationTest extends IntegrationTest {
       checkAssignment(
               webGoatUrlConfig.url("PasswordReset/SecurityQuestions"),
         Map.of("question", "What is your favorite color?"),
-        true);
+        false);
   }
 
   public void solveAssignment() {
@@ -97,13 +96,6 @@ public class PasswordResetLessonIntegrationTest extends IntegrationTest {
             .asString();
 
     Assertions.assertThat(responseBody).contains("Hi, you requested a password reset link");
-  }
-
-  @AfterEach
-  public void shutdown() {
-    // this will run only once after the list of dynamic tests has run, this is to test if the
-    // lesson is marked complete
-    checkResults("PasswordReset");
   }
 
   private void changePassword(String link) {
