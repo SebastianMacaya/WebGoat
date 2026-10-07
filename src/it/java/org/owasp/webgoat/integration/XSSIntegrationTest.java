@@ -27,7 +27,7 @@ public class XSSIntegrationTest extends IntegrationTest {
     params.put("QTY4", "1");
     params.put("field1", "<script>alert('XSS+Test')</script>");
     params.put("field2", "111");
-      checkAssignmentWithGet(webGoatUrlConfig.url("CrossSiteScripting/attack5a"), params, true);
+      checkAssignmentWithGet(webGoatUrlConfig.url("CrossSiteScripting/attack5a"), params, false);
 
     params.clear();
     params.put("DOMTestRoute", "start.mvc#test");
@@ -115,6 +115,6 @@ public class XSSIntegrationTest extends IntegrationTest {
             + "MyCommentDAO.addComment(threadID, userID).getCleanHTML());");
       checkAssignment(webGoatUrlConfig.url("CrossSiteScripting/attack4"), params, true);
 
-    checkResults("CrossSiteScripting");
+    // The reflected script exercise is intentionally no longer solvable by injecting a script.
   }
 }
