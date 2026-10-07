@@ -6,6 +6,7 @@ package org.owasp.webgoat.lessons.spoofcookie;
 
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.failed;
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.informationMessage;
+import static org.owasp.webgoat.container.assignments.AttackResultBuilder.success;
 
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletResponse;
@@ -43,11 +44,17 @@ public class SpoofCookieAssignment implements AssignmentEndpoint {
   private static final String ATTACK_USERNAME = "tom";
 
   private static final Map<String, String> users =
-      Map.of("webgoat", "webgoat", "admin", "admin", ATTACK_USERNAME, "apasswordfortom");
+      Map.of("webgoat", "webgoat", "admin", "admin", ATTACK_USERNAME, randomPassword());
   private final SecureRandom random = new SecureRandom();
   private final Map<String, AuthenticatedCookie> authenticatedCookies = new ConcurrentHashMap<>();
 
   private record AuthenticatedCookie(String username, Instant expiresAt) {}
+
+  private static String randomPassword() {
+    byte[] bytes = new byte[32];
+    new SecureRandom().nextBytes(bytes);
+    return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+  }
 
   @PostMapping(path = "/SpoofCookie/login")
   @ResponseBody
@@ -81,11 +88,6 @@ public class SpoofCookieAssignment implements AssignmentEndpoint {
   private AttackResult credentialsLoginFlow(
       String username, String password, HttpServletResponse response) {
     String lowerCasedUsername = username.toLowerCase();
-    if (ATTACK_USERNAME.equals(lowerCasedUsername)
-        && users.get(lowerCasedUsername).equals(password)) {
-      return informationMessage(this).feedback("spoofcookie.cheating").build();
-    }
-
     String authPassword = users.getOrDefault(lowerCasedUsername, "");
     if (!authPassword.isBlank() && authPassword.equals(password)) {
       Instant now = Instant.now();
@@ -113,6 +115,9 @@ public class SpoofCookieAssignment implements AssignmentEndpoint {
   private AttackResult cookieLoginFlow(String cookieValue) {
     AuthenticatedCookie authenticatedCookie = authenticatedCookies.get(cookieValue);
     if (authenticatedCookie != null && Instant.now().isBefore(authenticatedCookie.expiresAt())) {
+      if (ATTACK_USERNAME.equals(authenticatedCookie.username())) {
+        return success(this).build();
+      }
       return failed(this)
           .feedback("spoofcookie.cookie-login")
           .output("Authenticated as " + authenticatedCookie.username())
