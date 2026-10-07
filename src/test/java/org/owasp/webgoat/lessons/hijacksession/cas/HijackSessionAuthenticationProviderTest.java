@@ -65,6 +65,16 @@ class HijackSessionAuthenticationProviderTest {
   }
 
   @Test
+  void failedLoginsDoNotCreateAuthenticatedSessions() {
+    for (int i = 0; i < 100; i++) {
+      Authentication auth =
+          provider.authenticate(Authentication.builder().name("guest").credentials("wrong").build());
+      assertThat(auth.isAuthenticated(), is(false));
+    }
+    assertThat(provider.getSessionsSize(), is(0));
+  }
+
+  @Test
   void testAuthenticationToString() {
     AuthenticationBuilder authBuilder =
         Authentication.builder()
@@ -103,7 +113,6 @@ class HijackSessionAuthenticationProviderTest {
   @Test
   void testMaxSessions() {
     for (int i = 0; i <= HijackSessionAuthenticationProvider.MAX_SESSIONS + 1; i++) {
-      provider.authorizedUserAutoLogin();
       provider.addSession(null);
     }
 

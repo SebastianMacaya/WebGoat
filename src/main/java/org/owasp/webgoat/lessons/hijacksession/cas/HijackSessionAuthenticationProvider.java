@@ -8,8 +8,6 @@ import java.security.SecureRandom;
 import java.util.Base64;
 import java.util.LinkedList;
 import java.util.Queue;
-import java.util.concurrent.ThreadLocalRandom;
-import java.util.function.DoublePredicate;
 import java.util.function.Supplier;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
@@ -27,7 +25,6 @@ public class HijackSessionAuthenticationProvider implements AuthenticationProvid
   private static final SecureRandom SECURE_RANDOM = new SecureRandom();
   protected static final int MAX_SESSIONS = 50;
 
-  private static final DoublePredicate PROBABILITY_DOUBLE_PREDICATE = pr -> pr < 0.75;
   private static final Supplier<String> GENERATE_SESSION_ID =
       () -> {
         byte[] bytes = new byte[32];
@@ -53,17 +50,7 @@ public class HijackSessionAuthenticationProvider implements AuthenticationProvid
       authentication.setId(GENERATE_SESSION_ID.get());
     }
 
-    authorizedUserAutoLogin();
-
     return authentication;
-  }
-
-  protected synchronized void authorizedUserAutoLogin() {
-    if (!PROBABILITY_DOUBLE_PREDICATE.test(ThreadLocalRandom.current().nextDouble())) {
-      Authentication authentication = AUTHENTICATION_SUPPLIER.get();
-      authentication.setAuthenticated(true);
-      addSession(authentication.getId());
-    }
   }
 
   protected synchronized boolean addSession(String sessionId) {
