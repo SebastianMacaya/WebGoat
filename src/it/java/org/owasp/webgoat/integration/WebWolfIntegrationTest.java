@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import io.restassured.RestAssured;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 
 public class WebWolfIntegrationTest extends IntegrationTest {
@@ -34,24 +35,30 @@ public class WebWolfIntegrationTest extends IntegrationTest {
             .getBody()
             .asString();
 
-    String uniqueCode = responseBody.replace("%20", " ");
-    uniqueCode =
-        uniqueCode.substring(
-            21 + uniqueCode.lastIndexOf("your unique code is: "),
-            uniqueCode.lastIndexOf("your unique code is: ") + (21 + this.getUser().length()));
+    String uniqueCode =
+        extractCode(responseBody.replace("%20", " "), "your unique code is: ([A-Za-z0-9_-]+)");
     params.clear();
     params.put("uniqueCode", uniqueCode);
       checkAssignment(webGoatUrlConfig.url("WebWolf/mail"), params, true);
 
     // Assignment 4
-      RestAssured.given()
+    String landingPage =
+        RestAssured.given()
         .when()
         .relaxedHTTPSValidation()
         .cookie("JSESSIONID", getWebGoatCookie())
         .queryParams(params)
         .get(webGoatUrlConfig.url("WebWolf/landing/password-reset"))
         .then()
-        .statusCode(200);
+        .statusCode(200)
+        .extract()
+        .response()
+        .getBody()
+        .asString();
+    String landingCode =
+        extractCode(landingPage, "name=\"uniqueCode\"[^>]*value=\"([A-Za-z0-9_-]+)\"");
+    params.put("uniqueCode", landingCode);
+    params.put("username", getUser());
     RestAssured.given()
         .when()
         .relaxedHTTPSValidation()
@@ -71,11 +78,17 @@ public class WebWolfIntegrationTest extends IntegrationTest {
             .response()
             .getBody()
             .asString();
-    assertTrue(responseBody.contains(uniqueCode));
+    assertTrue(responseBody.contains(landingCode));
     params.clear();
-    params.put("uniqueCode", uniqueCode);
+    params.put("uniqueCode", landingCode);
       checkAssignment(webGoatUrlConfig.url("WebWolf/landing"), params, true);
 
     checkResults("WebWolfIntroduction");
+  }
+
+  private static String extractCode(String response, String pattern) {
+    var matcher = Pattern.compile(pattern).matcher(response);
+    assertTrue(matcher.find(), "Verification code not found in response");
+    return matcher.group(1);
   }
 }
