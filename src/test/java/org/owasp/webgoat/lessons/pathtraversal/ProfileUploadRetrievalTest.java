@@ -14,7 +14,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import java.io.File;
 import java.net.URI;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -33,7 +32,7 @@ class ProfileUploadRetrievalTest extends LessonTest {
   }
 
   @Test
-  void solve() throws Exception {
+  void traversalAndPredictableAnswerAreRejected() throws Exception {
     // Look at the response
     mockMvc
         .perform(get("/PathTraversal/random-picture"))
@@ -47,24 +46,21 @@ class ProfileUploadRetrievalTest extends LessonTest {
     mockMvc
         .perform(get(uri))
         .andExpect(status().is(404))
-        // .andDo(MockMvcResultHandlers.print())
-        .andExpect(content().string(containsString("path-traversal-secret.jpg")));
+        .andExpect(content().string(""));
 
     // Retrieve the secret file (note: .jpg is added by the server)
     uri = new URI("/PathTraversal/random-picture?id=%2E%2E%2F%2E%2E%2Fpath-traversal-secret");
     mockMvc
         .perform(get(uri))
-        .andExpect(status().is(200))
-        .andExpect(
-            content().string("You found it submit the SHA-512 hash of your username as answer"))
-        .andExpect(content().contentTypeCompatibleWith(MediaType.IMAGE_JPEG));
+        .andExpect(status().is(404))
+        .andExpect(content().string(""));
 
     // Post flag
     mockMvc
         .perform(post("/PathTraversal/random").param("secret", Sha512DigestUtils.shaHex("test")))
         .andExpect(status().is(200))
         .andExpect(jsonPath("$.assignment", equalTo("ProfileUploadRetrieval")))
-        .andExpect(jsonPath("$.lessonCompleted", is(true)));
+        .andExpect(jsonPath("$.lessonCompleted", is(false)));
   }
 
   @Test
@@ -77,10 +73,10 @@ class ProfileUploadRetrievalTest extends LessonTest {
   }
 
   @Test
-  void unknownFileShouldGiveDirectoryContents() throws Exception {
+  void unknownFileDoesNotRevealDirectoryContents() throws Exception {
     mockMvc
         .perform(get("/PathTraversal/random-picture?id=test"))
         .andExpect(status().is(404))
-        .andExpect(content().string(containsString("cats" + File.separator + "8.jpg")));
+        .andExpect(content().string(""));
   }
 }

@@ -26,7 +26,7 @@ class ProfileUploadTest extends LessonTest {
   }
 
   @Test
-  void solve() throws Exception {
+  void rejectsTraversalInProfileName() throws Exception {
     var profilePicture =
         new MockMultipartFile(
             "uploadedFile", "../picture.jpg", "text/plain", "an image".getBytes());
@@ -38,7 +38,7 @@ class ProfileUploadTest extends LessonTest {
                 .param("fullName", "../John Doe"))
         .andExpect(status().is(200))
         .andExpect(jsonPath("$.assignment", CoreMatchers.equalTo("ProfileUpload")))
-        .andExpect(jsonPath("$.lessonCompleted", CoreMatchers.is(true)));
+        .andExpect(jsonPath("$.lessonCompleted", CoreMatchers.is(false)));
   }
 
   @Test
@@ -61,7 +61,7 @@ class ProfileUploadTest extends LessonTest {
 
   @Test
   @WithWebGoatUser
-  void shouldNotOverrideExistingFile() throws Exception {
+  void rejectsPlatformSeparatorInProfileName() throws Exception {
     var profilePicture =
         new MockMultipartFile("uploadedFile", "picture.jpg", "text/plain", "an image".getBytes());
     mockMvc
@@ -69,12 +69,7 @@ class ProfileUploadTest extends LessonTest {
             MockMvcRequestBuilders.multipart("/PathTraversal/profile-upload")
                 .file(profilePicture)
                 .param("fullName", ".." + File.separator + "test"))
-        .andExpect(
-            jsonPath(
-                "$.output",
-                CoreMatchers.anyOf(
-                    CoreMatchers.containsString("Is a directory"),
-                    CoreMatchers.containsString("..\\\\" + "test"))))
+        .andExpect(jsonPath("$.lessonCompleted", CoreMatchers.is(false)))
         .andExpect(status().is(200));
   }
 

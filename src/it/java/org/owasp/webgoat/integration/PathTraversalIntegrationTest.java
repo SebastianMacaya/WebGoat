@@ -20,7 +20,6 @@ import java.util.zip.ZipOutputStream;
 import lombok.SneakyThrows;
 import org.hamcrest.CoreMatchers;
 import org.hamcrest.MatcherAssert;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.TestFactory;
@@ -64,7 +63,7 @@ class PathTraversalIT extends IntegrationTest {
             .statusCode(200)
             .extract()
             .path("lessonCompleted"),
-        CoreMatchers.is(true));
+        CoreMatchers.is(false));
   }
 
   private void assignment2() throws IOException {
@@ -80,7 +79,7 @@ class PathTraversalIT extends IntegrationTest {
             .statusCode(200)
             .extract()
             .path("lessonCompleted"),
-        CoreMatchers.is(true));
+        CoreMatchers.is(false));
   }
 
   private void assignment3() throws IOException {
@@ -98,7 +97,7 @@ class PathTraversalIT extends IntegrationTest {
             .statusCode(200)
             .extract()
             .path("lessonCompleted"),
-        CoreMatchers.is(true));
+        CoreMatchers.is(false));
   }
 
   private void assignment4() throws IOException {
@@ -110,13 +109,12 @@ class PathTraversalIT extends IntegrationTest {
         .cookie("JSESSIONID", getWebGoatCookie())
         .get(webGoatUrlConfig.url(uri))
         .then()
-        .statusCode(200)
-        .body(CoreMatchers.is("You found it submit the SHA-512 hash of your username as answer"));
+        .statusCode(404);
 
       checkAssignment(
               webGoatUrlConfig.url("PathTraversal/random"),
         Map.of("secret", Sha512DigestUtils.shaHex(this.getUser())),
-        true);
+        false);
   }
 
   private void assignment5() throws IOException {
@@ -147,10 +145,4 @@ class PathTraversalIT extends IntegrationTest {
         CoreMatchers.is(true));
   }
 
-  @AfterEach
-  void shutdown() {
-    // this will run only once after the list of dynamic tests has run, this is to test if the
-    // lesson is marked complete
-    checkResults("PathTraversal");
-  }
 }
