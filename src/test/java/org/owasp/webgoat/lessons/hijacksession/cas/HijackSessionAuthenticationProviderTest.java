@@ -58,7 +58,10 @@ class HijackSessionAuthenticationProviderTest {
     Set<String> ids = new HashSet<>();
     for (int i = 0; i < 200; i++) {
       String sessionId = HijackSessionAuthenticationProvider.AUTHENTICATION_SUPPLIER.get().getId();
-      assertThat(sessionId.matches("[A-Za-z0-9_-]{43}"), is(true));
+      assertThat(sessionId.matches("[0-9]{1,19}-[0-9]{1,19}"), is(true));
+      String[] parts = sessionId.split("-");
+      Long.parseLong(parts[0]);
+      Long.parseLong(parts[1]);
       ids.add(sessionId);
     }
     assertThat(ids.size(), is(200));
