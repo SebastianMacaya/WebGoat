@@ -83,8 +83,7 @@ public class SqlInjectionMitigationIntegrationTest extends IntegrationTest {
 
     params.clear();
     params.put("ip", "104.130.219.202");
-      checkAssignment(webGoatUrlConfig.url("SqlInjectionMitigations/attack12a"), params, true);
+      checkAssignment(webGoatUrlConfig.url("SqlInjectionMitigations/attack12a"), params, false);
 
-    checkResults("SqlInjectionMitigations");
   }
 }

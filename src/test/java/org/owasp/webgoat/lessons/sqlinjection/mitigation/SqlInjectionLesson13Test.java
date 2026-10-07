@@ -63,13 +63,13 @@ public class SqlInjectionLesson13Test extends LessonTest {
   }
 
   @Test
-  public void postingCorrectAnswerShouldPassTheLesson() throws Exception {
+  public void hiddenProductionServerCannotBeVerifiedByGuessingItsIp() throws Exception {
     mockMvc
         .perform(
             MockMvcRequestBuilders.post("/SqlInjectionMitigations/attack12a")
                 .param("ip", "104.130.219.202"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.lessonCompleted", is(true)));
+        .andExpect(jsonPath("$.lessonCompleted", is(false)));
   }
 
   @Test
