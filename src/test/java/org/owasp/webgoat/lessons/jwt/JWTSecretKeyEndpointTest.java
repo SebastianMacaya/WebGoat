@@ -5,6 +5,7 @@
 package org.owasp.webgoat.lessons.jwt;
 
 import static org.hamcrest.Matchers.is;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -13,12 +14,14 @@ import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.impl.TextCodec;
 import java.time.Instant;
+import java.util.Base64;
 import java.util.Date;
 import org.hamcrest.CoreMatchers;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.owasp.webgoat.WithWebGoatUser;
 import org.owasp.webgoat.container.plugins.LessonTest;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
@@ -41,6 +44,43 @@ public class JWTSecretKeyEndpointTest extends LessonTest {
     claims.put("Email", "tom@webgoat.org");
     claims.put("Role", new String[] {"Manager"});
     return claims;
+  }
+
+  private String signingKey() {
+    return (String) ReflectionTestUtils.getField(JWTSecretKeyEndpoint.class, "JWT_SECRET");
+  }
+
+  @Test
+  void signingKeyHasAtLeast512Bits() {
+    assertTrue(Base64.getDecoder().decode(signingKey()).length >= 64);
+  }
+
+  @Test
+  void validHs256SignatureCanStillBeVerified() throws Exception {
+    String token =
+        Jwts.builder()
+            .setClaims(createClaims("WebGoat"))
+            .signWith(SignatureAlgorithm.HS256, signingKey())
+            .compact();
+
+    mockMvc
+        .perform(MockMvcRequestBuilders.post("/JWT/secret").param("token", token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.lessonCompleted", is(true)));
+  }
+
+  @Test
+  void signedTokenWithDifferentAlgorithmIsRejected() throws Exception {
+    String token =
+        Jwts.builder()
+            .setClaims(createClaims("WebGoat"))
+            .signWith(SignatureAlgorithm.HS512, signingKey())
+            .compact();
+
+    mockMvc
+        .perform(MockMvcRequestBuilders.post("/JWT/secret").param("token", token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.lessonCompleted", is(false)));
   }
 
   @Test

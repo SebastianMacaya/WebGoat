@@ -8,7 +8,7 @@ import static org.owasp.webgoat.container.assignments.AttackResultBuilder.failed
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.success;
 
 import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.Jwt;
+import io.jsonwebtoken.Jws;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.impl.TextCodec;
@@ -37,7 +37,7 @@ public class JWTSecretKeyEndpoint implements AssignmentEndpoint {
       List.of("iss", "iat", "exp", "aud", "sub", "username", "Email", "Role");
 
   private static String createSigningKey() {
-    byte[] key = new byte[32];
+    byte[] key = new byte[64];
     new SecureRandom().nextBytes(key);
     return TextCodec.BASE64.encode(key);
   }
@@ -62,8 +62,11 @@ public class JWTSecretKeyEndpoint implements AssignmentEndpoint {
   @ResponseBody
   public AttackResult login(@RequestParam String token) {
     try {
-      Jwt jwt = Jwts.parser().setSigningKey(JWT_SECRET).parseClaimsJws(token);
-      Claims claims = (Claims) jwt.getBody();
+      Jws<Claims> jwt = Jwts.parser().setSigningKey(JWT_SECRET).parseClaimsJws(token);
+      if (!SignatureAlgorithm.HS256.getValue().equals(jwt.getHeader().getAlgorithm())) {
+        return failed(this).feedback("jwt-invalid-token").build();
+      }
+      Claims claims = jwt.getBody();
       if (!claims.keySet().containsAll(expectedClaims)) {
         return failed(this).feedback("jwt-secret-claims-missing").build();
       } else {
