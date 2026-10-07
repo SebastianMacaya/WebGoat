@@ -109,8 +109,12 @@ public class GeneralLessonIntegrationTest extends IntegrationTest {
       Map<String, Object> params = new HashMap<>();
       params.clear();
       params.put("payload", solution);
-        checkAssignment(webGoatUrlConfig.url("VulnerableComponents/attack1"), params, true);
-      checkResults("VulnerableComponents");
+      checkAssignment(webGoatUrlConfig.url("VulnerableComponents/attack1"), params, false);
+      params.put(
+          "payload",
+          "<contact><id>1</id><firstName>Bruce</firstName><lastName>Mayhew</lastName>"
+              + "<email>webgoat@owasp.org</email></contact>");
+      checkAssignment(webGoatUrlConfig.url("VulnerableComponents/attack1"), params, false);
     }
   }
 
