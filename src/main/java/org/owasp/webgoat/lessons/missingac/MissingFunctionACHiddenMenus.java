@@ -6,7 +6,7 @@ package org.owasp.webgoat.lessons.missingac;
 
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.failed;
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.success;
-import static org.owasp.webgoat.lessons.missingac.MissingFunctionAccessPolicy.requireAdmin;
+import static org.owasp.webgoat.lessons.missingac.MissingFunctionAccessPolicy.isAdmin;
 
 import org.owasp.webgoat.container.assignments.AssignmentEndpoint;
 import org.owasp.webgoat.container.assignments.AssignmentHints;
@@ -29,7 +29,9 @@ public class MissingFunctionACHiddenMenus implements AssignmentEndpoint {
       produces = {"application/json"})
   @ResponseBody
   public AttackResult completed(String hiddenMenu1, String hiddenMenu2) {
-    requireAdmin();
+    if (!isAdmin()) {
+      return failed(this).feedback("access-control.hidden-menus.failure").build();
+    }
     if ("Users".equals(hiddenMenu1) && "Config".equals(hiddenMenu2)) {
       return success(this).output("").feedback("access-control.hidden-menus.success").build();
     }

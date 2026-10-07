@@ -15,12 +15,16 @@ final class MissingFunctionAccessPolicy {
   private MissingFunctionAccessPolicy() {}
 
   static void requireAdmin() {
-    Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-    if (authentication == null
-        || !authentication.isAuthenticated()
-        || authentication.getAuthorities().stream()
-            .noneMatch(authority -> WebGoatUser.ROLE_ADMIN.equals(authority.getAuthority()))) {
+    if (!isAdmin()) {
       throw new ResponseStatusException(HttpStatus.FORBIDDEN);
     }
+  }
+
+  static boolean isAdmin() {
+    Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+    return authentication != null
+        && authentication.isAuthenticated()
+        && authentication.getAuthorities().stream()
+            .anyMatch(authority -> WebGoatUser.ROLE_ADMIN.equals(authority.getAuthority()));
   }
 }

@@ -50,10 +50,10 @@ class AccessControlIntegrationTest extends IntegrationTest {
                 new User("Jerry", "doesnotreallymatter", true),
                 MissingFunctionAC.PASSWORD_SALT_ADMIN)
             .getUserHash();
-    assertForbiddenForm(
+    assertFailedAssignment(
         "access-control/hidden-menu", Map.of("hiddenMenu1", "Users", "hiddenMenu2", "Config"));
-    assertForbiddenForm("access-control/user-hash", Map.of("userHash", simpleHash));
-    assertForbiddenForm("access-control/user-hash-fix", Map.of("userHash", adminHash));
+    assertFailedAssignment("access-control/user-hash", Map.of("userHash", simpleHash));
+    assertFailedAssignment("access-control/user-hash-fix", Map.of("userHash", adminHash));
   }
 
   private void assertForbiddenGet(String path) {
@@ -86,13 +86,16 @@ class AccessControlIntegrationTest extends IntegrationTest {
         .statusCode(HttpStatus.SC_FORBIDDEN);
   }
 
-  private void assertForbiddenForm(String path, Map<String, String> params) {
-    RestAssured.given()
+  private void assertFailedAssignment(String path, Map<String, String> params) {
+    Boolean solved = RestAssured.given()
         .relaxedHTTPSValidation()
         .cookie("JSESSIONID", getWebGoatCookie())
         .formParams(params)
         .post(webGoatUrlConfig.url(path))
         .then()
-        .statusCode(HttpStatus.SC_FORBIDDEN);
+        .statusCode(HttpStatus.SC_OK)
+        .extract()
+        .path("lessonCompleted");
+    assertThat(solved).isFalse();
   }
 }

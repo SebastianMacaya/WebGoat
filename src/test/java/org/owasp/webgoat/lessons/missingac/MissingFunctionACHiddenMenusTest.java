@@ -71,7 +71,8 @@ class MissingFunctionACHiddenMenusTest extends LessonTest {
             MockMvcRequestBuilders.post("/access-control/hidden-menu")
                 .param("hiddenMenu1", "Users")
                 .param("hiddenMenu2", "Config"))
-        .andExpect(status().isForbidden());
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.lessonCompleted", CoreMatchers.is(false)));
   }
 
   @Test

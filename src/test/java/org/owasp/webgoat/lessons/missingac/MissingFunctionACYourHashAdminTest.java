@@ -62,6 +62,7 @@ class MissingFunctionACYourHashAdminTest extends LessonTest {
         .perform(
             MockMvcRequestBuilders.post("/access-control/user-hash-fix")
                 .param("userHash", userHash))
-        .andExpect(status().isForbidden());
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.lessonCompleted", CoreMatchers.is(false)));
   }
 }
