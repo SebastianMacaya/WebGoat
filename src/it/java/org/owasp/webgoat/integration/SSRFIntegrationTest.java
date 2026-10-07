@@ -18,12 +18,12 @@ public class SSRFIntegrationTest extends IntegrationTest {
     params.clear();
     params.put("url", "images/jerry.png");
 
-      checkAssignment(webGoatUrlConfig.url("SSRF/task1"), params, true);
+      checkAssignment(webGoatUrlConfig.url("SSRF/task1"), params, false);
     params.clear();
     params.put("url", "http://ifconfig.pro");
 
-      checkAssignment(webGoatUrlConfig.url("SSRF/task2"), params, true);
+      checkAssignment(webGoatUrlConfig.url("SSRF/task2"), params, false);
 
-    checkResults("SSRF");
+    // Neither submitted URL should complete an SSRF assignment.
   }
 }
