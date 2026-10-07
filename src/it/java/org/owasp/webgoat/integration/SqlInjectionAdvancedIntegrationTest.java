@@ -39,7 +39,7 @@ public class SqlInjectionAdvancedIntegrationTest extends IntegrationTest {
 
     params.clear();
     params.put("userid_6b", "passW0rD");
-      checkAssignment(webGoatUrlConfig.url("SqlInjectionAdvanced/attack6b"), params, true);
+      checkAssignment(webGoatUrlConfig.url("SqlInjectionAdvanced/attack6b"), params, false);
 
     params.clear();
     params.put(

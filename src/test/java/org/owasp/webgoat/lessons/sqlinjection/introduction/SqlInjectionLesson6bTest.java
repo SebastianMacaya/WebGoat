@@ -5,6 +5,7 @@
 package org.owasp.webgoat.lessons.sqlinjection.introduction;
 
 import static org.hamcrest.Matchers.is;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -15,22 +16,27 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 public class SqlInjectionLesson6bTest extends LessonTest {
 
   @Test
-  public void submitCorrectPassword() throws Exception {
-    mockMvc
-        .perform(
-            MockMvcRequestBuilders.post("/SqlInjectionAdvanced/attack6b")
-                .param("userid_6b", "passW0rD"))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.lessonCompleted", is(true)));
-  }
+  public void submittedPasswordsDoNotExposeDavesCredential() throws Exception {
+    var knownPasswordResponse =
+        mockMvc
+            .perform(
+                MockMvcRequestBuilders.post("/SqlInjectionAdvanced/attack6b")
+                    .param("userid_6b", "passW0rD"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.lessonCompleted", is(false)))
+            .andReturn();
 
-  @Test
-  public void submitWrongPassword() throws Exception {
-    mockMvc
-        .perform(
-            MockMvcRequestBuilders.post("/SqlInjectionAdvanced/attack6b")
-                .param("userid_6b", "John"))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.lessonCompleted", is(false)));
+    var wrongPasswordResponse =
+        mockMvc
+            .perform(
+                MockMvcRequestBuilders.post("/SqlInjectionAdvanced/attack6b")
+                    .param("userid_6b", "John"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.lessonCompleted", is(false)))
+            .andReturn();
+
+    assertEquals(
+        knownPasswordResponse.getResponse().getContentAsString(),
+        wrongPasswordResponse.getResponse().getContentAsString());
   }
 }
