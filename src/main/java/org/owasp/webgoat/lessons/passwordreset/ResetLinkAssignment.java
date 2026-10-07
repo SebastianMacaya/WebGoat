@@ -83,9 +83,12 @@ public class ResetLinkAssignment implements AssignmentEndpoint {
   }
 
   @GetMapping("/PasswordReset/reset/reset-password/{link}")
-  public ModelAndView resetPassword(@PathVariable(value = "link") String link, Model model) {
+  public ModelAndView resetPassword(
+      @PathVariable(value = "link") String link,
+      Model model,
+      @CurrentUsername String username) {
     ModelAndView modelAndView = new ModelAndView();
-    if (validLink(link) != null) {
+    if (ownsRecipient(validLink(link), username)) {
       PasswordChangeForm form = new PasswordChangeForm();
       form.setResetLink(link);
       model.addAttribute("form", form);
@@ -112,7 +115,8 @@ public class ResetLinkAssignment implements AssignmentEndpoint {
       return modelAndView;
     }
     ResetLink resetLink = validLink(form.getResetLink());
-    if (resetLink == null || !resetLinks.remove(form.getResetLink(), resetLink)) {
+    if (!ownsRecipient(resetLink, username)
+        || !resetLinks.remove(form.getResetLink(), resetLink)) {
       modelAndView.setViewName(VIEW_FORMATTER.formatted("password_link_not_found"));
       return modelAndView;
     }
@@ -133,5 +137,14 @@ public class ResetLinkAssignment implements AssignmentEndpoint {
       return null;
     }
     return resetLink;
+  }
+
+  private boolean ownsRecipient(ResetLink resetLink, String username) {
+    if (resetLink == null || !hasText(username)) {
+      return false;
+    }
+    String email = resetLink.email();
+    return (username + "@webgoat.org").equalsIgnoreCase(email)
+        || ("tom".equalsIgnoreCase(username) && TOM_EMAIL.equalsIgnoreCase(email));
   }
 }
