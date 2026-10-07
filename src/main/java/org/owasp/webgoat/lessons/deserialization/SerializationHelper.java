@@ -8,6 +8,7 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.io.ObjectInputFilter;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
@@ -16,13 +17,21 @@ import java.util.Base64;
 public class SerializationHelper {
 
   private static final char[] hexArray = "0123456789ABCDEF".toCharArray();
+  private static final ObjectInputFilter TASK_FILTER =
+      ObjectInputFilter.Config.createFilter(
+          "maxdepth=5;maxrefs=20;maxbytes=4096;maxarray=256;"
+              + "org.dummy.insecure.framework.VulnerableTaskHolder;"
+              + "java.time.Ser;java.time.LocalDateTime;java.lang.String;!*");
 
   public static Object fromString(String s) throws IOException, ClassNotFoundException {
+    if (s.length() > 8192) {
+      throw new IllegalArgumentException("Serialized token is too large");
+    }
     byte[] data = Base64.getDecoder().decode(s);
-    ObjectInputStream ois = new ObjectInputStream(new ByteArrayInputStream(data));
-    Object o = ois.readObject();
-    ois.close();
-    return o;
+    try (ObjectInputStream ois = new ObjectInputStream(new ByteArrayInputStream(data))) {
+      ois.setObjectInputFilter(TASK_FILTER);
+      return ois.readObject();
+    }
   }
 
   public static String toString(Serializable o) throws IOException {

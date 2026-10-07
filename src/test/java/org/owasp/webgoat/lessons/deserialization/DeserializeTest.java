@@ -4,10 +4,16 @@
  */
 package org.owasp.webgoat.lessons.deserialization;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertTimeout;
 import static org.hamcrest.Matchers.is;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.Serializable;
+import java.time.Duration;
 import org.dummy.insecure.framework.VulnerableTaskHolder;
 import org.hamcrest.CoreMatchers;
 import org.junit.jupiter.api.Test;
@@ -16,30 +22,35 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 
 class DeserializeTest extends LessonTest {
 
-  private static String OS = System.getProperty("os.name").toLowerCase();
+  private static boolean gadgetExecuted;
 
   @Test
-  void success() throws Exception {
-    if (OS.indexOf("win") > -1) {
-      mockMvc
-          .perform(
-              MockMvcRequestBuilders.post("/InsecureDeserialization/task")
-                  .param(
-                      "token",
-                      SerializationHelper.toString(
-                          new VulnerableTaskHolder("wait", "ping localhost -n 5"))))
-          .andExpect(status().isOk())
-          .andExpect(jsonPath("$.lessonCompleted", is(true)));
-    } else {
-      mockMvc
-          .perform(
-              MockMvcRequestBuilders.post("/InsecureDeserialization/task")
-                  .param(
-                      "token",
-                      SerializationHelper.toString(new VulnerableTaskHolder("wait", "sleep 5"))))
-          .andExpect(status().isOk())
-          .andExpect(jsonPath("$.lessonCompleted", is(true)));
-    }
+  void taskActionIsNeverExecuted() throws Exception {
+    String token = SerializationHelper.toString(new VulnerableTaskHolder("wait", "sleep 5"));
+    Object restored =
+        assertTimeout(Duration.ofSeconds(3), () -> SerializationHelper.fromString(token));
+    assertThat(restored).isInstanceOf(VulnerableTaskHolder.class);
+
+    mockMvc
+        .perform(MockMvcRequestBuilders.post("/InsecureDeserialization/task").param("token", token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.lessonCompleted", is(false)))
+        .andExpect(
+            jsonPath(
+                "$.feedback",
+                is(messages.getMessage("insecure-deserialization.safe-task"))));
+  }
+
+  @Test
+  void unrelatedGadgetIsRejectedBeforeItsReadObjectRuns() throws Exception {
+    gadgetExecuted = false;
+    String token = SerializationHelper.toString(new TestGadget());
+
+    mockMvc
+        .perform(MockMvcRequestBuilders.post("/InsecureDeserialization/task").param("token", token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.lessonCompleted", is(false)));
+    assertThat(gadgetExecuted).isFalse();
   }
 
   @Test
@@ -94,5 +105,14 @@ class DeserializeTest extends LessonTest {
                 "$.feedback",
                 CoreMatchers.is(messages.getMessage("insecure-deserialization.stringobject"))))
         .andExpect(jsonPath("$.lessonCompleted", is(false)));
+  }
+
+  private static final class TestGadget implements Serializable {
+    private static final long serialVersionUID = 1L;
+
+    private void readObject(ObjectInputStream stream) throws IOException, ClassNotFoundException {
+      gadgetExecuted = true;
+      stream.defaultReadObject();
+    }
   }
 }
