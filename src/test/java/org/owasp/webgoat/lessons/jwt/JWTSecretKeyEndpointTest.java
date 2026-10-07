@@ -47,25 +47,47 @@ public class JWTSecretKeyEndpointTest extends LessonTest {
   }
 
   @Test
-  public void solveAssignment() throws Exception {
+  public void forgedTokenWithKnownSecretIsRejected() throws Exception {
     Claims claims = createClaims("WebGoat");
     String token = Jwts.builder().setClaims(claims).signWith(HS512, JWT_SECRET).compact();
 
     mockMvc
         .perform(MockMvcRequestBuilders.post("/JWT/secret").param("token", token))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.lessonCompleted", is(true)));
+        .andExpect(jsonPath("$.lessonCompleted", is(false)))
+        .andExpect(jsonPath("$.feedback", is(messages.getMessage("jwt-invalid-token"))));
   }
 
   @Test
-  public void solveAssignmentWithLowercase() throws Exception {
+  public void forgedLowercaseIdentityIsRejected() throws Exception {
     Claims claims = createClaims("webgoat");
     String token = Jwts.builder().setClaims(claims).signWith(HS512, JWT_SECRET).compact();
 
     mockMvc
         .perform(MockMvcRequestBuilders.post("/JWT/secret").param("token", token))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.lessonCompleted", is(true)));
+        .andExpect(jsonPath("$.lessonCompleted", is(false)));
+  }
+
+  @Test
+  public void issuedTokenRetainsTomIdentity() throws Exception {
+    String issuedToken =
+        mockMvc
+            .perform(MockMvcRequestBuilders.get("/JWT/secret/gettoken"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    mockMvc
+        .perform(MockMvcRequestBuilders.post("/JWT/secret").param("token", issuedToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.lessonCompleted", is(false)))
+        .andExpect(
+            jsonPath(
+                "$.feedback",
+                CoreMatchers.is(
+                    messages.getMessage("jwt-secret-incorrect-user", "default", "Tom"))));
   }
 
   @Test

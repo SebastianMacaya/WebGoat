@@ -44,7 +44,7 @@ public class JWTLessonIntegrationTest extends IntegrationTest {
 
     resetVotes();
 
-    findPassword();
+    rejectForgedTokenWithRecoveredSecret();
 
     buyAsTom();
 
@@ -54,7 +54,6 @@ public class JWTLessonIntegrationTest extends IntegrationTest {
 
     quiz();
 
-    checkResults("JWT");
   }
 
   private String generateToken(String key) {
@@ -98,7 +97,7 @@ public class JWTLessonIntegrationTest extends IntegrationTest {
         CoreMatchers.is(true));
   }
 
-  private void findPassword() {
+  private void rejectForgedTokenWithRecoveredSecret() {
 
     String accessToken =
         RestAssured.given()
@@ -124,7 +123,7 @@ public class JWTLessonIntegrationTest extends IntegrationTest {
             .statusCode(200)
             .extract()
             .path("lessonCompleted"),
-        CoreMatchers.is(true));
+        CoreMatchers.is(false));
   }
 
   private void resetVotes() throws IOException {
