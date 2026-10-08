@@ -15,6 +15,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.commons.lang3.StringUtils;
 import org.assertj.core.api.Assertions;
+import org.jsoup.Jsoup;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.TestFactory;
@@ -214,11 +215,11 @@ public class PasswordResetLessonIntegrationTest extends IntegrationTest {
   }
 
   private String getPasswordResetUrlFromMailbox() {
-    Matcher link =
-        Pattern.compile("href='(https?://[^']+/PasswordReset/reset/reset-password/[0-9a-f-]{36})'")
-            .matcher(getLatestPasswordResetEmail());
-    Assertions.assertThat(link.find()).isTrue();
-    return link.group(1);
+    var link =
+        Jsoup.parse(getLatestPasswordResetEmail())
+            .selectFirst("a[href*='/PasswordReset/reset/reset-password/']");
+    Assertions.assertThat(link).isNotNull();
+    return link.attr("href");
   }
 
   private boolean clickForgotEmailLink(String user) {

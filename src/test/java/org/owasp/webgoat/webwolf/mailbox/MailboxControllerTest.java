@@ -18,6 +18,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.Lists;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import org.assertj.core.api.Assertions;
+import org.jsoup.Jsoup;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -94,6 +96,60 @@ public class MailboxControllerTest {
                 .string(
                     containsString(
                         DateTimeFormatter.ofPattern("h:mm a").format(email.getTimestamp()))));
+  }
+
+  @Test
+  @WithMockUser(username = "tom")
+  public void webwolfPostmarkKeepsAnchorButDropsScripts() throws Exception {
+    String resetUrl =
+        "http://127.0.0.1:8080/WebGoat/PasswordReset/reset/reset-password/"
+            + "db680b68-a14a-465b-b861-2e3a6c70c0de";
+    Email email =
+        Email.builder()
+            .contents(
+                "<script>fetch('/WebWolf/landing/stolen')</script>"
+                    + "<img src=x onerror=alert(1)>"
+                    + "<a href='javascript:alert(1)' onclick='alert(1)'>bad link</a>"
+                    + "<a href='"
+                    + resetUrl
+                    + "' target='_blank' onclick='alert(1)'>reset link</a>")
+            .recipient("tom")
+            .sender("password-reset@webgoat-cloud.net")
+            .title("Your password reset link")
+            .time(LocalDateTime.now())
+            .build();
+    Mockito.when(mailbox.findByRecipientOrderByTimeDesc("tom"))
+        .thenReturn(Lists.newArrayList(email));
+
+    var result = this.mvc.perform(get("/mail")).andExpect(status().isOk()).andReturn();
+    String renderedMail =
+        Jsoup.parse(result.getResponse().getContentAsString()).selectFirst(".contents pre").html();
+    Assertions.assertThat(renderedMail)
+        .contains("href=\"" + resetUrl + "\"", "reset link")
+        .doesNotContain("<script", "onerror=", "onclick=", "javascript:");
+  }
+
+  @Test
+  @WithMockUser(username = "test1234")
+  public void safeResetMailKeepsOriginalLinkMarkup() throws Exception {
+    String resetUrl =
+        "http://127.0.0.1:8080/WebGoat/PasswordReset/reset/reset-password/"
+            + "db680b68-a14a-465b-b861-2e3a6c70c0de";
+    Email email =
+        Email.builder()
+            .contents("Use <a target='_blank' href='" + resetUrl + "'>link</a> to reset")
+            .recipient("test1234")
+            .sender("password-reset@webgoat-cloud.net")
+            .title("Your password reset link")
+            .time(LocalDateTime.now())
+            .build();
+    Mockito.when(mailbox.findByRecipientOrderByTimeDesc("test1234"))
+        .thenReturn(Lists.newArrayList(email));
+
+    this.mvc
+        .perform(get("/mail"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("href='" + resetUrl + "'")));
   }
 
   @Test
