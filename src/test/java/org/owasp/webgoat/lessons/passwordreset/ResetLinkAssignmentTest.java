@@ -10,11 +10,14 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
 import java.net.URI;
+import java.time.Duration;
 import java.time.Instant;
 import org.assertj.core.api.Assertions;
 import org.hamcrest.CoreMatchers;
@@ -22,6 +25,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.owasp.webgoat.container.plugins.LessonTest;
+import org.owasp.webgoat.container.users.WebGoatUser;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.mock.mockito.MockBean;
@@ -40,6 +44,9 @@ class ResetLinkAssignmentTest extends LessonTest {
 
   @Value("${webwolf.mail.url}")
   private String webWolfMailURL;
+
+  @Value("${webwolf.url}")
+  private String webWolfURL;
 
   @Value("${webwolf.host}")
   private String webWolfHost;
@@ -152,16 +159,24 @@ class ResetLinkAssignmentTest extends LessonTest {
         .andExpect(status().isOk());
 
     String token = ResetLinkAssignment.resetLinks.keySet().iterator().next();
+    ResetLinkAssignment.ResetLink issuedLink = ResetLinkAssignment.resetLinks.get(token);
+    Assertions.assertThat(issuedLink.owner()).isEqualTo("tom");
+    Assertions.assertThat(issuedLink.email()).isEqualTo(TOM_EMAIL);
+    Assertions.assertThat(issuedLink.expiresAt())
+        .isBetween(Instant.now().plus(Duration.ofMinutes(14)), Instant.now().plus(Duration.ofMinutes(15)));
     ArgumentCaptor<PasswordResetEmail> mail = ArgumentCaptor.forClass(PasswordResetEmail.class);
     verify(restTemplate).postForEntity(eq(webWolfMailURL), mail.capture(), eq(Object.class));
     Assertions.assertThat(mail.getValue().getRecipient()).isEqualTo("tom");
     Assertions.assertThat(mail.getValue().getContents())
         .contains(webGoatURL + "/PasswordReset/reset/reset-password/" + token)
         .doesNotContain(webWolfHost + ":" + webWolfPort);
+    verify(restTemplate)
+        .getForEntity(
+            webWolfURL + "/PasswordReset/reset/reset-password/" + token, String.class);
   }
 
   @Test
-  void webWolfHostCannotDivertTomsToken() throws Exception {
+  void webWolfHostCannotChangeWhereTomsTokenIsMailed() throws Exception {
     mockMvc
         .perform(
             MockMvcRequestBuilders.post("/PasswordReset/ForgotPassword/create-password-reset-link")
@@ -173,6 +188,9 @@ class ResetLinkAssignmentTest extends LessonTest {
     String token = ResetLinkAssignment.resetLinks.keySet().iterator().next();
     ArgumentCaptor<PasswordResetEmail> mail = ArgumentCaptor.forClass(PasswordResetEmail.class);
     verify(restTemplate).postForEntity(eq(webWolfMailURL), mail.capture(), eq(Object.class));
+    verify(restTemplate)
+        .getForEntity(
+            webWolfURL + "/PasswordReset/reset/reset-password/" + token, String.class);
     verifyNoMoreInteractions(restTemplate);
     Assertions.assertThat(mail.getValue().getRecipient()).isEqualTo("tom");
     Assertions.assertThat(mail.getValue().getContents())
@@ -290,11 +308,15 @@ class ResetLinkAssignmentTest extends LessonTest {
   void tomsLinkChangesHisPasswordOnlyOnce() throws Exception {
     String token = "verified-tom-token";
     ResetLinkAssignment.resetLinks.put(
-        token, new ResetLinkAssignment.ResetLink(TOM_EMAIL, Instant.now().plusSeconds(60)));
+        token, new ResetLinkAssignment.ResetLink("tom", TOM_EMAIL, Instant.now().plusSeconds(60)));
+
+    mockMvc = MockMvcBuilders.webAppContextSetup(this.wac).apply(springSecurity()).build();
+    WebGoatUser tom = new WebGoatUser("tom", "password");
 
     mockMvc
         .perform(
             MockMvcRequestBuilders.post("/PasswordReset/reset/change-password")
+                .with(user(tom))
                 .param("resetLink", token)
                 .param("password", "newpass"))
         .andExpect(status().isOk())
@@ -308,6 +330,7 @@ class ResetLinkAssignmentTest extends LessonTest {
     mockMvc
         .perform(
             MockMvcRequestBuilders.post("/PasswordReset/reset/change-password")
+                .with(user(tom))
                 .param("resetLink", token)
                 .param("password", "otherpass"))
         .andExpect(status().isOk())
@@ -317,12 +340,31 @@ class ResetLinkAssignmentTest extends LessonTest {
   @Test
   void expiredLinkIsRejected() throws Exception {
     ResetLinkAssignment.resetLinks.put(
-        "expired", new ResetLinkAssignment.ResetLink(TOM_EMAIL, Instant.now().minusSeconds(1)));
+        "expired",
+        new ResetLinkAssignment.ResetLink("tom", TOM_EMAIL, Instant.now().minusSeconds(1)));
 
     mockMvc
         .perform(MockMvcRequestBuilders.get("/PasswordReset/reset/reset-password/expired"))
         .andExpect(status().isOk())
         .andExpect(view().name("lessons/passwordreset/templates/password_link_not_found.html"));
+    Assertions.assertThat(ResetLinkAssignment.resetLinks).doesNotContainKey("expired");
+  }
+
+  @Test
+  void expiredLinkCannotChangeItsOwnersPassword() throws Exception {
+    ResetLinkAssignment.resetLinks.put(
+        "expired",
+        new ResetLinkAssignment.ResetLink(
+            "test", "test@webgoat.org", Instant.now().minusSeconds(1)));
+
+    mockMvc
+        .perform(
+            MockMvcRequestBuilders.post("/PasswordReset/reset/change-password")
+                .param("resetLink", "expired")
+                .param("password", "Valid123"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("lessons/passwordreset/templates/password_link_not_found.html"));
+    Assertions.assertThat(ResetLinkAssignment.resetPasswordsByEmail).isEmpty();
     Assertions.assertThat(ResetLinkAssignment.resetLinks).doesNotContainKey("expired");
   }
 

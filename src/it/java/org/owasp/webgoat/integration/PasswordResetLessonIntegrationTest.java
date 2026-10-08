@@ -33,11 +33,11 @@ public class PasswordResetLessonIntegrationTest extends IntegrationTest {
     return Arrays.asList(
         dynamicTest("assignment 6 - check email link", () -> sendEmailShouldBeAvailableInWebWolf()),
         dynamicTest(
-            "assignment 6 - recipient can redeem a link without a WebGoat session",
-            () -> resetLinkWorksWithoutWebGoatSession()),
+            "assignment 6 - recipient must sign in before redeeming a link",
+            () -> resetLinkRequiresWebGoatSessionForRedemption()),
         dynamicTest(
-            "assignment 6 - poisoned Tom request cannot reach attacker mailbox",
-            () -> tomHostCannotLeakIntoWebWolf()),
+            "assignment 6 - Tom visit is recorded despite a poisoned Host",
+            () -> tomHostCannotDivertMailButIsRecordedInWebWolf()),
         dynamicTest(
             "assignment 6 - another account's link cannot reset Tom",
             () -> anotherPersonsLinkCannotResetTom()),
@@ -95,7 +95,7 @@ public class PasswordResetLessonIntegrationTest extends IntegrationTest {
         false);
   }
 
-  public void resetLinkWorksWithoutWebGoatSession() {
+  public void resetLinkRequiresWebGoatSessionForRedemption() {
     cleanMailbox();
     clickForgotEmailLink(this.getUser() + "@webgoat.org");
     String url = getPasswordResetUrlFromMailbox();
@@ -113,30 +113,16 @@ public class PasswordResetLessonIntegrationTest extends IntegrationTest {
             .asString();
     Assertions.assertThat(form).contains("Reset your password", token);
 
-    Assertions.assertThat(
-            RestAssured.given()
-                .relaxedHTTPSValidation()
-                .redirects()
-                .follow(false)
-                .formParams("resetLink", "invalid-token", "password", "Guest123")
-                .post(webGoatUrlConfig.url("PasswordReset/reset/change-password"))
-                .then()
-                .statusCode(200)
-                .extract()
-                .asString())
-        .contains("Password reset link is not valid");
+    RestAssured.given()
+        .relaxedHTTPSValidation()
+        .redirects()
+        .follow(false)
+        .formParams("resetLink", token, "password", "Guest123")
+        .post(webGoatUrlConfig.url("PasswordReset/reset/change-password"))
+        .then()
+        .statusCode(302);
 
-    String result =
-        RestAssured.given()
-            .relaxedHTTPSValidation()
-            .redirects()
-            .follow(false)
-            .formParams("resetLink", token, "password", "Guest123")
-            .post(webGoatUrlConfig.url("PasswordReset/reset/change-password"))
-            .then()
-            .statusCode(200)
-            .extract()
-            .asString();
+    String result = changePassword(token, "Guest123");
     Assertions.assertThat(result).contains("Password changed successfully");
     Assertions.assertThat(
             RestAssured.given()
@@ -208,7 +194,7 @@ public class PasswordResetLessonIntegrationTest extends IntegrationTest {
         .doesNotContain("attacker.example");
   }
 
-  public void tomHostCannotLeakIntoWebWolf() {
+  public void tomHostCannotDivertMailButIsRecordedInWebWolf() {
     cleanMailbox();
     int resetGetsBefore =
         StringUtils.countMatches(getWebWolfRequests(), "/PasswordReset/reset/reset-password/");
@@ -228,7 +214,7 @@ public class PasswordResetLessonIntegrationTest extends IntegrationTest {
         .doesNotContain("/PasswordReset/reset/reset-password/");
     Assertions.assertThat(
             StringUtils.countMatches(getWebWolfRequests(), "/PasswordReset/reset/reset-password/"))
-        .isEqualTo(resetGetsBefore);
+        .isGreaterThan(resetGetsBefore);
   }
 
   private String changePassword(String link, String password) {

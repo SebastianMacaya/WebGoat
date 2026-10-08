@@ -45,8 +45,6 @@ public class WebSecurityConfig {
                     .permitAll()
                     .requestMatchers(HttpMethod.GET, "/PasswordReset/reset/reset-password/**")
                     .permitAll()
-                    .requestMatchers(HttpMethod.POST, "/PasswordReset/reset/change-password")
-                    .permitAll()
                     .anyRequest()
                     .authenticated())
         .formLogin(

@@ -49,6 +49,9 @@ base URL. The Docker image defaults to `http://webgoat:8080/WebGoat` for a Docke
 network where the container has the name `webgoat`. Set this variable to a URL
 reachable by the person opening the email in other deployments, including the
 `/WebGoat` context path. Incoming `Host` headers do not change reset links.
+The Password Reset lesson records its simulated visit to Tom's link at the
+configured WebWolf URL. A captured UUID can change a password only in the
+matching WebGoat user's session; links expire after 15 minutes and work once.
 
 For some lessons you need the container run in the same timezone. For this you can set the TZ environment variable.
 E.g.

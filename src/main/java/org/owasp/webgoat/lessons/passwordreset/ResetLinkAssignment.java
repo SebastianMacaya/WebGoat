@@ -13,6 +13,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import org.owasp.webgoat.container.CurrentUsername;
 import org.owasp.webgoat.container.assignments.AssignmentEndpoint;
 import org.owasp.webgoat.container.assignments.AssignmentHints;
 import org.owasp.webgoat.container.assignments.AttackResult;
@@ -45,11 +46,11 @@ public class ResetLinkAssignment implements AssignmentEndpoint {
 
   private static final String VIEW_FORMATTER = "lessons/passwordreset/templates/%s.html";
   static final String TOM_EMAIL = "tom@webgoat-cloud.org";
-  static final Duration RESET_LINK_LIFETIME = Duration.ofMinutes(10);
+  static final Duration RESET_LINK_LIFETIME = Duration.ofMinutes(15);
   static final Map<String, ResetLink> resetLinks = new ConcurrentHashMap<>();
   static final Map<String, String> resetPasswordsByEmail = new ConcurrentHashMap<>();
 
-  record ResetLink(String email, Instant expiresAt) {}
+  record ResetLink(String owner, String email, Instant expiresAt) {}
 
   static final String TEMPLATE =
       """
@@ -93,6 +94,7 @@ public class ResetLinkAssignment implements AssignmentEndpoint {
 
   @PostMapping("/PasswordReset/reset/change-password")
   public ModelAndView changePassword(
+      @CurrentUsername String username,
       @Valid @ModelAttribute("form") PasswordChangeForm form,
       BindingResult bindingResult) {
     ModelAndView modelAndView = new ModelAndView();
@@ -105,7 +107,9 @@ public class ResetLinkAssignment implements AssignmentEndpoint {
     }
     synchronized (resetLinks) {
       ResetLink resetLink = validLink(form.getResetLink());
-      if (resetLink == null || !resetLinks.remove(form.getResetLink(), resetLink)) {
+      if (resetLink == null
+          || !resetLink.owner().equals(username)
+          || !resetLinks.remove(form.getResetLink(), resetLink)) {
         modelAndView.setViewName(VIEW_FORMATTER.formatted("password_link_not_found"));
         return modelAndView;
       }

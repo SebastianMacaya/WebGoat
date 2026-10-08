@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.client.RestClientException;
 
 /**
  * Part of the password reset assignment. Used to send the e-mail.
@@ -31,14 +32,17 @@ public class ResetLinkAssignmentForgotPassword implements AssignmentEndpoint {
 
   private final RestTemplate restTemplate;
   private final String webGoatURL;
+  private final String webWolfURL;
   private final String webWolfMailURL;
 
   public ResetLinkAssignmentForgotPassword(
       RestTemplate restTemplate,
       @Value("${webgoat.url}") String webGoatURL,
+      @Value("${webwolf.url}") String webWolfURL,
       @Value("${webwolf.mail.url}") String webWolfMailURL) {
     this.restTemplate = restTemplate;
     this.webGoatURL = webGoatURL.replaceAll("/+$", "");
+    this.webWolfURL = webWolfURL.replaceAll("/+$", "");
     this.webWolfMailURL = webWolfMailURL;
   }
 
@@ -55,17 +59,28 @@ public class ResetLinkAssignmentForgotPassword implements AssignmentEndpoint {
     }
     // A poisoned Host header cannot change the reset recipient or trusted link.
     String resetLink = UUID.randomUUID().toString();
+    String owner = normalizedEmail.substring(0, normalizedEmail.indexOf('@'));
     synchronized (ResetLinkAssignment.resetLinks) {
       ResetLinkAssignment.resetLinks.put(
           resetLink,
           new ResetLinkAssignment.ResetLink(
-              normalizedEmail, Instant.now().plus(ResetLinkAssignment.RESET_LINK_LIFETIME)));
+              owner, normalizedEmail, Instant.now().plus(ResetLinkAssignment.RESET_LINK_LIFETIME)));
     }
     try {
       sendMailToUser(normalizedEmail, resetLink);
     } catch (Exception e) {
       ResetLinkAssignment.resetLinks.remove(resetLink);
       return failed(this).output("E-mail can't be send. please try again.").build();
+    }
+
+    if (ResetLinkAssignment.TOM_EMAIL.equals(normalizedEmail)) {
+      try {
+        // WebWolf records this visit; its response does not determine whether mail was delivered.
+        restTemplate.getForEntity(
+            webWolfURL + "/PasswordReset/reset/reset-password/" + resetLink, String.class);
+      } catch (RestClientException ignored) {
+        // The simulated visit has no matching page in WebWolf.
+      }
     }
 
     // Delivering a link is not proof that the requester controls the mailbox.
