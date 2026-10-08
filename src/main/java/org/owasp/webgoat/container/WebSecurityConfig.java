@@ -10,6 +10,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
@@ -41,6 +42,10 @@ public class WebSecurityConfig {
                         "/registration",
                         "/register.mvc",
                         "/actuator/**")
+                    .permitAll()
+                    .requestMatchers(HttpMethod.GET, "/PasswordReset/reset/reset-password/**")
+                    .permitAll()
+                    .requestMatchers(HttpMethod.POST, "/PasswordReset/reset/change-password")
                     .permitAll()
                     .anyRequest()
                     .authenticated())

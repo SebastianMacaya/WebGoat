@@ -33,6 +33,9 @@ public class PasswordResetLessonIntegrationTest extends IntegrationTest {
     return Arrays.asList(
         dynamicTest("assignment 6 - check email link", () -> sendEmailShouldBeAvailableInWebWolf()),
         dynamicTest(
+            "assignment 6 - recipient can redeem a link without a WebGoat session",
+            () -> resetLinkWorksWithoutWebGoatSession()),
+        dynamicTest(
             "assignment 6 - poisoned Tom request cannot reach attacker mailbox",
             () -> tomHostCannotLeakIntoWebWolf()),
         dynamicTest(
@@ -90,6 +93,70 @@ public class PasswordResetLessonIntegrationTest extends IntegrationTest {
         webGoatUrlConfig.url("PasswordReset/reset/login"),
         Map.of("email", "tom@webgoat-cloud.org", "password", newPassword),
         false);
+  }
+
+  public void resetLinkWorksWithoutWebGoatSession() {
+    cleanMailbox();
+    clickForgotEmailLink(this.getUser() + "@webgoat.org");
+    String url = getPasswordResetUrlFromMailbox();
+    String token = URI.create(url).getPath().replaceFirst(".*/", "");
+
+    String form =
+        RestAssured.given()
+            .relaxedHTTPSValidation()
+            .redirects()
+            .follow(false)
+            .get(url)
+            .then()
+            .statusCode(200)
+            .extract()
+            .asString();
+    Assertions.assertThat(form).contains("Reset your password", token);
+
+    Assertions.assertThat(
+            RestAssured.given()
+                .relaxedHTTPSValidation()
+                .redirects()
+                .follow(false)
+                .formParams("resetLink", "invalid-token", "password", "Guest123")
+                .post(webGoatUrlConfig.url("PasswordReset/reset/change-password"))
+                .then()
+                .statusCode(200)
+                .extract()
+                .asString())
+        .contains("Password reset link is not valid");
+
+    String result =
+        RestAssured.given()
+            .relaxedHTTPSValidation()
+            .redirects()
+            .follow(false)
+            .formParams("resetLink", token, "password", "Guest123")
+            .post(webGoatUrlConfig.url("PasswordReset/reset/change-password"))
+            .then()
+            .statusCode(200)
+            .extract()
+            .asString();
+    Assertions.assertThat(result).contains("Password changed successfully");
+    Assertions.assertThat(
+            RestAssured.given()
+                .relaxedHTTPSValidation()
+                .redirects()
+                .follow(false)
+                .get(url)
+                .then()
+                .statusCode(200)
+                .extract()
+                .asString())
+        .contains("Password reset link is not valid");
+    RestAssured.given()
+        .relaxedHTTPSValidation()
+        .redirects()
+        .follow(false)
+        .formParams("email", "tom@webgoat-cloud.org", "password", "Guest123")
+        .post(webGoatUrlConfig.url("PasswordReset/reset/login"))
+        .then()
+        .statusCode(302);
   }
 
   public void olderLinksCannotResetAfterPasswordChange() {
