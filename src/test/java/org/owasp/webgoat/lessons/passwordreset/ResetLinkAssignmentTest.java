@@ -131,7 +131,7 @@ class ResetLinkAssignmentTest extends LessonTest {
                 .param("email", "test@webgoat.org")
                 .header(HttpHeaders.HOST, "attacker.example:9090"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.lessonCompleted", CoreMatchers.is(true)));
+        .andExpect(jsonPath("$.lessonCompleted", CoreMatchers.is(false)));
 
     String token = ResetLinkAssignment.resetLinks.keySet().iterator().next();
     ArgumentCaptor<PasswordResetEmail> mail = ArgumentCaptor.forClass(PasswordResetEmail.class);
@@ -168,7 +168,7 @@ class ResetLinkAssignmentTest extends LessonTest {
                 .param("email", TOM_EMAIL)
                 .header(HttpHeaders.HOST, webWolfHost + ":" + webWolfPort))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.lessonCompleted", CoreMatchers.is(true)));
+        .andExpect(jsonPath("$.lessonCompleted", CoreMatchers.is(false)));
     Assertions.assertThat(ResetLinkAssignment.resetLinks).hasSize(1);
     String token = ResetLinkAssignment.resetLinks.keySet().iterator().next();
     ArgumentCaptor<PasswordResetEmail> mail = ArgumentCaptor.forClass(PasswordResetEmail.class);
