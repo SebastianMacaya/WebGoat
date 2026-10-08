@@ -89,7 +89,7 @@ class ResetLinkAssignmentTest extends LessonTest {
         mockMvc
             .perform(
                 MockMvcRequestBuilders.post("/PasswordReset/reset/change-password")
-                    .param("password", "new_password"))
+                    .param("password", "newpass"))
             .andExpect(status().isOk())
             .andExpect(view().name("lessons/passwordreset/templates/password_link_not_found.html"))
             .andReturn();
@@ -131,7 +131,7 @@ class ResetLinkAssignmentTest extends LessonTest {
                 .param("email", "test@webgoat.org")
                 .header(HttpHeaders.HOST, "attacker.example:9090"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.lessonCompleted", CoreMatchers.is(false)));
+        .andExpect(jsonPath("$.lessonCompleted", CoreMatchers.is(true)));
 
     String token = ResetLinkAssignment.resetLinks.keySet().iterator().next();
     ArgumentCaptor<PasswordResetEmail> mail = ArgumentCaptor.forClass(PasswordResetEmail.class);
@@ -168,7 +168,7 @@ class ResetLinkAssignmentTest extends LessonTest {
                 .param("email", TOM_EMAIL)
                 .header(HttpHeaders.HOST, webWolfHost + ":" + webWolfPort))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.lessonCompleted", CoreMatchers.is(false)));
+        .andExpect(jsonPath("$.lessonCompleted", CoreMatchers.is(true)));
     Assertions.assertThat(ResetLinkAssignment.resetLinks).hasSize(1);
     String token = ResetLinkAssignment.resetLinks.keySet().iterator().next();
     ArgumentCaptor<PasswordResetEmail> mail = ArgumentCaptor.forClass(PasswordResetEmail.class);
@@ -247,6 +247,35 @@ class ResetLinkAssignmentTest extends LessonTest {
             MockMvcRequestBuilders.get("/PasswordReset/reset/reset-password/{link}", tomToken))
         .andExpect(status().isOk())
         .andExpect(view().name("lessons/passwordreset/templates/password_reset.html"));
+  }
+
+  @Test
+  void invalidPasswordLengthDoesNotConsumeResetLink() throws Exception {
+    mockMvc
+        .perform(
+            MockMvcRequestBuilders.post("/PasswordReset/ForgotPassword/create-password-reset-link")
+                .param("email", "test@webgoat.org"))
+        .andExpect(status().isOk());
+    String token = ResetLinkAssignment.resetLinks.keySet().iterator().next();
+
+    for (String invalidPassword : new String[] {"short", "elevenchars"}) {
+      mockMvc
+          .perform(
+              MockMvcRequestBuilders.post("/PasswordReset/reset/change-password")
+                  .param("resetLink", token)
+                  .param("password", invalidPassword))
+          .andExpect(status().isOk())
+          .andExpect(view().name("lessons/passwordreset/templates/password_reset.html"));
+      Assertions.assertThat(ResetLinkAssignment.resetLinks).containsKey(token);
+    }
+
+    mockMvc
+        .perform(
+            MockMvcRequestBuilders.post("/PasswordReset/reset/change-password")
+                .param("resetLink", token)
+                .param("password", "Valid123"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("lessons/passwordreset/templates/success.html"));
   }
 
   @Test

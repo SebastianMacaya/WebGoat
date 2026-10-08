@@ -6,6 +6,7 @@ package org.owasp.webgoat.lessons.passwordreset;
 
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.failed;
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.informationMessage;
+import static org.owasp.webgoat.container.assignments.AttackResultBuilder.success;
 
 import java.time.Instant;
 import java.util.Locale;
@@ -69,7 +70,8 @@ public class ResetLinkAssignmentForgotPassword implements AssignmentEndpoint {
     }
 
     // Delivering a link is not proof that the requester controls the mailbox.
-    return informationMessage(this).feedback("email.send").feedbackArgs(email).build();
+    // This lesson step tracks delivery; the recipient still controls the token.
+    return success(this).feedback("email.send").feedbackArgs(email).build();
   }
 
   private void sendMailToUser(String email, String resetLink) {

@@ -8,6 +8,7 @@ import static org.owasp.webgoat.container.assignments.AttackResultBuilder.failed
 import static org.owasp.webgoat.container.assignments.AttackResultBuilder.success;
 import static org.springframework.util.StringUtils.hasText;
 
+import jakarta.validation.Valid;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
@@ -92,7 +93,7 @@ public class ResetLinkAssignment implements AssignmentEndpoint {
 
   @PostMapping("/PasswordReset/reset/change-password")
   public ModelAndView changePassword(
-      @ModelAttribute("form") PasswordChangeForm form,
+      @Valid @ModelAttribute("form") PasswordChangeForm form,
       BindingResult bindingResult) {
     ModelAndView modelAndView = new ModelAndView();
     if (!hasText(form.getPassword())) {
