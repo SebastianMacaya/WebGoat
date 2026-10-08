@@ -102,12 +102,15 @@ public class ResetLinkAssignment implements AssignmentEndpoint {
       modelAndView.setViewName(VIEW_FORMATTER.formatted("password_reset"));
       return modelAndView;
     }
-    ResetLink resetLink = validLink(form.getResetLink());
-    if (resetLink == null || !resetLinks.remove(form.getResetLink(), resetLink)) {
-      modelAndView.setViewName(VIEW_FORMATTER.formatted("password_link_not_found"));
-      return modelAndView;
+    synchronized (resetLinks) {
+      ResetLink resetLink = validLink(form.getResetLink());
+      if (resetLink == null || !resetLinks.remove(form.getResetLink(), resetLink)) {
+        modelAndView.setViewName(VIEW_FORMATTER.formatted("password_link_not_found"));
+        return modelAndView;
+      }
+      resetPasswordsByEmail.put(resetLink.email(), form.getPassword());
+      resetLinks.entrySet().removeIf(entry -> resetLink.email().equals(entry.getValue().email()));
     }
-    resetPasswordsByEmail.put(resetLink.email(), form.getPassword());
     modelAndView.setViewName(VIEW_FORMATTER.formatted("success"));
     return modelAndView;
   }

@@ -17,6 +17,7 @@ EXPOSE 8080
 EXPOSE 9090
 
 ENV TZ=Europe/Amsterdam
+ENV WEBGOAT_PUBLIC_URL=http://webgoat:8080/WebGoat
 
 WORKDIR /home/webgoat
 ENTRYPOINT [ "java", \

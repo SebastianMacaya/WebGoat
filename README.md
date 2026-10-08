@@ -41,14 +41,20 @@ Already have a browser and ZAP and/or Burp installed on your machine in this cas
 Every release is also published on [DockerHub](https://hub.docker.com/r/webgoat/webgoat).
 
 ```shell
-docker run -it -p 127.0.0.1:8080:8080 -p 127.0.0.1:9090:9090 webgoat/webgoat
+docker run -it -p 127.0.0.1:8080:8080 -p 127.0.0.1:9090:9090 -e WEBGOAT_PUBLIC_URL=http://127.0.0.1:8080/WebGoat webgoat/webgoat
 ```
+
+In this patched build, password reset emails use `WEBGOAT_PUBLIC_URL` as the trusted
+base URL. The Docker image defaults to `http://webgoat:8080/WebGoat` for a Docker
+network where the container has the name `webgoat`. Set this variable to a URL
+reachable by the person opening the email in other deployments, including the
+`/WebGoat` context path. Incoming `Host` headers do not change reset links.
 
 For some lessons you need the container run in the same timezone. For this you can set the TZ environment variable.
 E.g.
 
 ```shell
-docker run -it -p 127.0.0.1:8080:8080 -p 127.0.0.1:9090:9090 -e TZ=America/Boise webgoat/webgoat
+docker run -it -p 127.0.0.1:8080:8080 -p 127.0.0.1:9090:9090 -e WEBGOAT_PUBLIC_URL=http://127.0.0.1:8080/WebGoat -e TZ=America/Boise webgoat/webgoat
 ```
 
 If you want to use OWASP ZAP or another proxy, you can no longer use 127.0.0.1 or localhost. but
@@ -61,7 +67,7 @@ you can use custom host entries. For example:
 Then you can run the container with:
 
 ```shell
-docker run -it -p 127.0.0.1:8080:8080 -p 127.0.0.1:9090:9090 -e WEBGOAT_HOST=www.webgoat.local -e WEBWOLF_HOST=www.webwolf.local -e TZ=America/Boise webgoat/webgoat
+docker run -it -p 127.0.0.1:8080:8080 -p 127.0.0.1:9090:9090 -e WEBGOAT_PUBLIC_URL=http://www.webgoat.local:8080/WebGoat -e WEBGOAT_HOST=www.webgoat.local -e WEBWOLF_HOST=www.webwolf.local -e TZ=America/Boise webgoat/webgoat
 ```
 
 Then visit http://www.webgoat.local:8080/WebGoat/ and http://www.webwolf.local:9090/WebWolf/
@@ -160,6 +166,6 @@ java -jar target/webgoat-2023.8-SNAPSHOT.jar
 Or in a docker run it would (once this version is pushed into docker hub) look like this:
 
 ```Shell
-docker run -d -p 127.0.0.1:8080:8080 -p 127.0.0.1:9090:9090 -e EXCLUDE_CATEGORIES="CLIENT_SIDE,GENERAL,CHALLENGE" -e EXCLUDE_LESSONS="SqlInjectionAdvanced,SqlInjectionMitigations" webgoat/webgoat
+docker run -d -p 127.0.0.1:8080:8080 -p 127.0.0.1:9090:9090 -e WEBGOAT_PUBLIC_URL=http://127.0.0.1:8080/WebGoat -e EXCLUDE_CATEGORIES="CLIENT_SIDE,GENERAL,CHALLENGE" -e EXCLUDE_LESSONS="SqlInjectionAdvanced,SqlInjectionMitigations" webgoat/webgoat
 ```
 
